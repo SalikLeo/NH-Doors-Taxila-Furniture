@@ -207,29 +207,29 @@ window.SalesForm = {
               </div>
 
               <!-- Input Row for Order Item -->
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                <div class="sm:col-span-6">
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                <div class="sm:col-span-5">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Item Description / Name</label>
                   <input type="text" id="sf-new-item-desc" placeholder="Item Description / Name"
                     onkeydown="if(event.key === 'Enter') { document.getElementById('sf-new-item-price').focus(); }"
-                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 focus:border-emerald-500 outline-none">
+                    class="w-full h-[38px] bg-white border border-slate-300 rounded-lg px-3 text-sm font-bold text-slate-800 focus:border-emerald-500 outline-none">
                 </div>
                 <div class="sm:col-span-2">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Qty</label>
                   <input type="number" id="sf-new-item-qty" value="1" min="1" step="1"
-                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-center text-slate-800 focus:border-emerald-500 outline-none">
+                    class="w-full h-[38px] bg-white border border-slate-300 rounded-lg px-3 text-sm font-bold text-center text-slate-800 focus:border-emerald-500 outline-none">
                 </div>
                 <div class="sm:col-span-3">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Total Price (Rs.)</label>
                   <input type="number" id="sf-new-item-price" placeholder="Price" min="0" step="1"
                     onkeydown="if(event.key === 'Enter') SalesForm.addOrderItem();"
-                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 text-right focus:border-emerald-500 outline-none font-mono">
+                    class="w-full h-[38px] bg-white border border-slate-300 rounded-lg px-3 text-sm font-bold text-slate-800 text-right focus:border-emerald-500 outline-none font-mono">
                 </div>
-                <div class="sm:col-span-1 flex items-end">
+                <div class="sm:col-span-2">
                   <button type="button" onclick="SalesForm.addOrderItem()"
-                    class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black py-1.5 rounded-lg flex items-center justify-center transition-all shadow-sm"
+                    class="w-full h-[38px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm text-xs"
                     title="Add Item to Bill">
-                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <i data-lucide="plus" class="w-4 h-4"></i> Add
                   </button>
                 </div>
               </div>
@@ -273,7 +273,7 @@ window.SalesForm = {
               </div>
 
               <!-- Input Row for Material Selection -->
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                 <div class="sm:col-span-7 relative">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Select Material from Stock</label>
                   <div class="relative">
@@ -282,7 +282,7 @@ window.SalesForm = {
                       oninput="SalesForm.handleMaterialSearch(this.value)"
                       onfocus="if(!this.readOnly) SalesForm.handleMaterialSearch(this.value)"
                       onclick="if(!this.readOnly) SalesForm.handleMaterialSearch(this.value)"
-                      class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 pr-8 text-sm font-bold text-slate-800 focus:border-amber-500 outline-none">
+                      class="w-full h-[38px] bg-white border border-slate-300 rounded-lg px-3 pr-8 text-sm font-bold text-slate-800 focus:border-amber-500 outline-none">
                     <button type="button" id="sf-material-clear-btn" onclick="SalesForm.clearStockMaterialSelection()"
                       class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded-full transition-all"
                       title="Clear selected material">
@@ -299,14 +299,14 @@ window.SalesForm = {
                   </label>
                   <input type="number" id="sf-material-qty" value="1" min="0.1" step="any"
                     onkeydown="if(event.key === 'Enter') SalesForm.addUsedMaterial();"
-                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-center text-slate-800 focus:border-amber-500 outline-none">
+                    class="w-full h-[38px] bg-white border border-slate-300 rounded-lg px-3 text-sm font-bold text-center text-slate-800 focus:border-amber-500 outline-none">
                 </div>
 
-                <div class="sm:col-span-2 flex items-end">
+                <div class="sm:col-span-2">
                   <button type="button" onclick="SalesForm.addUsedMaterial()"
-                    class="w-full bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black py-1.5 rounded-lg flex items-center justify-center gap-1 transition-all shadow-sm text-xs"
+                    class="w-full h-[38px] bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm text-xs"
                     title="Add Material to Order">
-                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
+                    <i data-lucide="plus" class="w-4 h-4"></i> Add
                   </button>
                 </div>
               </div>
