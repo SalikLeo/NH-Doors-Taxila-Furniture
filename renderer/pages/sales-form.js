@@ -462,6 +462,8 @@ window.SalesForm = {
     };
     document.removeEventListener('click', this.outsideClickHandler);
     document.addEventListener('click', this.outsideClickHandler);
+    document.removeEventListener('mousedown', this.outsideClickHandler);
+    document.addEventListener('mousedown', this.outsideClickHandler);
   },
 
   closeAllDropdowns() {
@@ -631,7 +633,10 @@ window.SalesForm = {
     }
 
     dropdown.innerHTML = matches.map(p => {
-      const isAlreadyAdded = this.usedMaterials.some(m => m.id === p.id && m.section === p.slug);
+      const isAlreadyAdded = this.usedMaterials.some(m => 
+        (String(m.id) === String(p.id) && String(m.section) === String(p.slug)) ||
+        (m.item_name && p.item_name && m.item_name.trim().toLowerCase() === p.item_name.trim().toLowerCase())
+      );
       if (isAlreadyAdded) {
         return `
           <div class="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs opacity-55 cursor-not-allowed select-none" title="Already added to order">
@@ -665,7 +670,10 @@ window.SalesForm = {
   },
 
   selectStockMaterial(id, slug) {
-    const isAlreadyAdded = this.usedMaterials.some(m => m.id === id && m.section === slug);
+    const isAlreadyAdded = this.usedMaterials.some(m => 
+      (String(m.id) === String(id) && String(m.section) === String(slug)) ||
+      (this.availableStock.find(p => p.id === id && p.slug === slug)?.item_name && m.item_name && m.item_name.trim().toLowerCase() === this.availableStock.find(p => p.id === id && p.slug === slug).item_name.trim().toLowerCase())
+    );
     if (isAlreadyAdded) return;
 
     const item = this.availableStock.find(p => p.id === id && p.slug === slug);
@@ -958,6 +966,33 @@ window.SalesForm = {
       items: combinedItems
     };
 
+    if (shouldPrint) {
+      // Recheck / Confirm Window: Do NOT save to DB yet!
+      this.pendingSaleData = {
+        saleData,
+        dueAmount,
+        finalCustName,
+        finalCustPhone,
+        customerId: this.customerId
+      };
+
+      const receiptHtml = await this.generateReceipt({
+        ...saleData,
+        id: this.editingSaleId || this.saleNumber
+      });
+
+      const invTitle = this.saleNumber ? (this.saleNumber.startsWith('#') ? `Receipt: ${this.saleNumber}` : `Receipt: #${this.saleNumber}`) : 'Receipt Preview';
+      app.showPreview(
+        receiptHtml, 
+        invTitle, 
+        '80MM THERMAL RECEIPT', 
+        'receipt-print', 
+        () => this.confirmAndCompleteSale()
+      );
+      return;
+    }
+
+    // Direct save without printing (Save Order button)
     app.showLoading();
     try {
       const savedId = await window.api.saveProposal(saleData);
@@ -996,24 +1031,86 @@ window.SalesForm = {
       }
 
       app.hideLoading();
-
-      if (shouldPrint) {
-        const receiptHtml = await this.generateReceipt({
-          ...saleData,
-          id: savedId
-        });
-        app.showPreview(receiptHtml, `Receipt: #${this.saleNumber}`, '80MM THERMAL RECEIPT');
-        await app.printReceipt();
-      } else {
-        app.showAlert(`Order #${this.saleNumber} successfully saved!`);
-      }
-
+      app.showAlert(`Order #${this.saleNumber} successfully saved!`);
       this.resetForm();
     } catch (err) {
       app.hideLoading();
       console.error('Save Order Error:', err);
       app.showAlert('Error saving order: ' + err.message);
     }
+  },
+
+  // Called when user clicks "Confirm & Print" in the preview window
+  async confirmAndCompleteSale() {
+    if (!this.pendingSaleData) {
+      this.closePreview();
+      return;
+    }
+
+    const { saleData, dueAmount, finalCustName, finalCustPhone, customerId } = this.pendingSaleData;
+
+    app.showLoading();
+    try {
+      const savedId = await window.api.saveProposal(saleData);
+
+      // Handle Customer Khata balance update
+      if (dueAmount > 0 || customerId) {
+        let activeCustId = customerId;
+        if (!activeCustId && finalCustName.toLowerCase() !== 'walk-in customer') {
+          try {
+            activeCustId = await window.api.saveCustomer({
+              name: finalCustName,
+              phone: finalCustPhone,
+              address: '',
+              amount: 0
+            });
+          } catch (e) {}
+        }
+        if (activeCustId) {
+          try {
+            const cust = (await window.api.getCustomers()).find(c => c.id === activeCustId);
+            if (cust) {
+              const currentKhata = Number(cust.amount) || 0;
+              const updatedKhata = Math.max(0, currentKhata + dueAmount);
+              await window.api.saveCustomer({
+                id: cust.id,
+                name: cust.name,
+                phone: cust.phone,
+                address: cust.address,
+                amount: updatedKhata
+              });
+            }
+          } catch (e) {
+            console.error('Failed to update customer khata balance:', e);
+          }
+        }
+      }
+
+      this.pendingSaleData = null;
+      app.hideLoading();
+
+      // Close preview modal
+      const modal = document.getElementById('preview-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      // Print physical thermal receipt
+      await app.printReceipt();
+
+      app.showAlert(`Order #${this.saleNumber} completed & printed!`);
+      this.resetForm();
+    } catch (err) {
+      app.hideLoading();
+      console.error('Confirm & Save Order Error:', err);
+      app.showAlert('Error completing order: ' + err.message);
+    }
+  },
+
+  onClosePreview() {
+    // If preview modal is closed or discarded, clear pending data (do NOT save anything)
+    this.pendingSaleData = null;
   },
 
   // Generate Customer Thermal Receipt (NEVER shows ingredients / stock materials!)
@@ -1076,7 +1173,7 @@ window.SalesForm = {
         <!-- Metadata -->
         <div style="font-size: 11px; line-height: 1.35; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px dashed #000;">
           <div style="display: flex; justify-content: space-between;">
-            <span><b>INV #:</b> #${invoiceNum}</span>
+            <span><b>INV #:</b> ${invoiceNum.startsWith('#') ? invoiceNum : `#${invoiceNum}`}</span>
             <span><b>DATE:</b> ${dateFormatted} ${timeFormatted}</span>
           </div>
           ${data.customer_name ? `<div style="margin-top: 1.5px;"><b>CUSTOMER:</b> ${data.customer_name}</div>` : ''}

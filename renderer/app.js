@@ -911,7 +911,7 @@ const app = {
     this.paymentCallback = null;
   },
 
-  showPreview(html, title = 'Receipt Preview', subtitle = '80MM THERMAL RECEIPT', targetContainerId = 'receipt-print') {
+  showPreview(html, title = 'Receipt Preview', subtitle = '80MM THERMAL RECEIPT', targetContainerId = 'receipt-print', onConfirm = null) {
     this.setPrintContent(targetContainerId, html);
     const previewEl = document.getElementById('preview-paper');
     if (previewEl) previewEl.innerHTML = html;
@@ -920,6 +920,8 @@ const app = {
     const subtitleEl = document.getElementById('preview-subtitle');
     if (titleEl) titleEl.textContent = title;
     if (subtitleEl) subtitleEl.textContent = subtitle;
+
+    this.currentPreviewConfirm = onConfirm;
 
     const printBtn = document.getElementById('confirm-print-btn');
     if (printBtn) {
@@ -935,11 +937,17 @@ const app = {
 
   closePreview() {
     const modal = document.getElementById('preview-modal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
     
-    if (this.currentPage === 'proposal-form' && SalesForm.onClosePreview) {
-        SalesForm.onClosePreview();
+    if (typeof this.currentPreviewConfirm === 'function') {
+      this.currentPreviewConfirm = null;
+    }
+
+    if (this.currentPage === 'proposal-form' && window.SalesForm && SalesForm.onClosePreview) {
+      SalesForm.onClosePreview();
     }
   },
 
@@ -1001,13 +1009,22 @@ const app = {
   },
 
   async confirmPrint() {
+    if (typeof this.currentPreviewConfirm === 'function') {
+      const confirmFn = this.currentPreviewConfirm;
+      this.currentPreviewConfirm = null;
+      await confirmFn();
+      return;
+    }
+
     const modal = document.getElementById('preview-modal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
     
     await this.printReceipt();
     
-    if (this.currentPage === 'proposal-form' && SalesForm.onAfterPrint) {
+    if (this.currentPage === 'proposal-form' && window.SalesForm && SalesForm.onAfterPrint) {
         SalesForm.onAfterPrint();
     }
   },
