@@ -3,9 +3,17 @@ window.Companies = {
   currentView: 'transactions',
   currentTxnPeriod: 'day',
   currentCompPeriod: 'day',
+  currentHistoryPeriod: 'all',
+  historyTypeFilter: 'all',
   dataList: [],
   fullTxnHistory: [],
   txnsFilterType: 'all',
+  txnsPage: 1,
+  txnsPageSize: 50,
+  historyPage: 1,
+  historyPageSize: 25,
+  allTxnsPage: 1,
+  allTxnsPageSize: 50,
   editingTxn: null,
   editingCompanyId: null,
 
@@ -141,7 +149,7 @@ window.Companies = {
 
         <!-- Transactions Table -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div class="overflow-auto max-h-[calc(100vh-250px)] custom-scrollbar">
+          <div class="overflow-auto max-h-[calc(100vh-290px)] custom-scrollbar">
             <table class="w-full text-sm text-left border-collapse border-b border-slate-200">
               <thead class="sticky top-0 z-10 bg-slate-50 shadow-sm border-b border-slate-200 uppercase text-[11px] font-black tracking-wider">
                 <tr class="border-b border-slate-200">
@@ -159,6 +167,7 @@ window.Companies = {
               </tbody>
             </table>
           </div>
+          <div id="txns-pagination-footer" class="shrink-0"></div>
         </div>
       </div>
 
@@ -373,26 +382,85 @@ window.Companies = {
 
       <!-- History Modal -->
       <div id="history-modal" onclick="if(event.target === this) Companies.hideHistoryModal()" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-[520] backdrop-blur-md animate-in fade-in duration-200">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl mx-4 overflow-hidden transform animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
-          <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
-            <div class="flex-1">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl lg:max-w-6xl mx-4 overflow-hidden transform animate-in zoom-in-95 duration-200 max-h-[88vh] flex flex-col">
+          <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-3 shrink-0">
+            <div class="flex justify-between items-center">
+              <div>
                 <h3 id="history-title" class="text-xl font-bold text-slate-800">Transaction History</h3>
-                <p id="history-subtitle" class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Company Details</p>
+                <p id="history-subtitle" class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Company Details</p>
+              </div>
+              <button onclick="Companies.hideHistoryModal()" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"><i data-lucide="x" class="w-6 h-6"></i></button>
             </div>
             
-            <div class="flex items-center gap-2 mx-4">
-                <select id="history-time-filter" onchange="Companies.filterHistory()" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-accent transition-all min-w-[120px]">
-                    <option value="all" selected>All Time</option>
-                    <option value="month">This Month</option>
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <!-- Filter Type & Time Period controls -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <select id="history-type-select" onchange="Companies.setHistoryTypeFilter(this.value)" class="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 font-bold outline-none focus:ring-2 focus:ring-accent transition-all shrink-0 cursor-pointer shadow-2xs">
+                  <option value="all" selected>All Types</option>
+                  <option value="purchase">Purchases</option>
+                  <option value="payment">Payments</option>
                 </select>
-                <div class="relative w-64">
-                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                    <input type="text" id="history-search" oninput="Companies.filterHistory()" placeholder="Search invoice, amount..." class="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent transition-all text-xs font-bold">
-                    <button type="button" id="history-search-clear-btn" onclick="Companies.clearHistorySearch()" title="Clear search" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-all cursor-pointer hidden"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
-                </div>
-            </div>
 
-            <button onclick="Companies.hideHistoryModal()" class="text-slate-400 hover:text-slate-600 transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
+                <div class="flex bg-slate-200/70 p-0.5 rounded-lg gap-0.5 shadow-2xs">
+                   <button type="button" id="history-period-day" onclick="Companies.setHistoryPeriodType('day')" class="px-2.5 py-1 text-[11px] font-black rounded-md transition-all text-slate-500 hover:text-slate-800 cursor-pointer">Daily</button>
+                   <button type="button" id="history-period-month" onclick="Companies.setHistoryPeriodType('month')" class="px-2.5 py-1 text-[11px] font-black rounded-md transition-all text-slate-500 hover:text-slate-800 cursor-pointer">Monthly</button>
+                   <button type="button" id="history-period-year" onclick="Companies.setHistoryPeriodType('year')" class="px-2.5 py-1 text-[11px] font-black rounded-md transition-all text-slate-500 hover:text-slate-800 cursor-pointer">Annual</button>
+                   <button type="button" id="history-period-all" onclick="Companies.setHistoryPeriodType('all')" class="px-2.5 py-1 text-[11px] font-black rounded-md transition-all bg-white shadow-sm text-slate-800 cursor-pointer">All</button>
+                </div>
+
+                <!-- Daily navigation controls -->
+                <div id="history-daily-controls" class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 hidden shadow-2xs">
+                   <button type="button" onclick="Companies.changeHistoryDateStep(-1)" class="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-all cursor-pointer" title="Previous Day">
+                     <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                   </button>
+                   <input type="date" id="history-date-picker" onchange="Companies.filterHistory()" oninput="Companies.filterHistory()" class="bg-transparent border-0 px-1 py-0.5 text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                   <button type="button" onclick="Companies.changeHistoryDateStep(1)" class="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-all cursor-pointer" title="Next Day">
+                     <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                   </button>
+                   <button type="button" onclick="Companies.setHistoryToday()" class="px-2 py-0.5 text-[10px] font-black uppercase bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-all cursor-pointer">Today</button>
+                </div>
+
+                <!-- Monthly navigation controls -->
+                <div id="history-monthly-controls" class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 hidden shadow-2xs">
+                   <button type="button" onclick="Companies.changeHistoryMonthStep(-1)" class="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-all cursor-pointer" title="Previous Month">
+                     <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                   </button>
+                   <select id="history-month-select" onchange="Companies.filterHistory()" class="bg-transparent border-0 px-1.5 py-0.5 text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                     <option value="1">Jan</option>
+                     <option value="2">Feb</option>
+                     <option value="3">Mar</option>
+                     <option value="4">Apr</option>
+                     <option value="5">May</option>
+                     <option value="6">Jun</option>
+                     <option value="7">Jul</option>
+                     <option value="8">Aug</option>
+                     <option value="9">Sep</option>
+                     <option value="10">Oct</option>
+                     <option value="11">Nov</option>
+                     <option value="12">Dec</option>
+                   </select>
+                   <select id="history-month-year-select" onchange="Companies.filterHistory()" class="bg-transparent border-0 px-1.5 py-0.5 text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                   </select>
+                   <button type="button" onclick="Companies.changeHistoryMonthStep(1)" class="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-all cursor-pointer" title="Next Month">
+                     <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                   </button>
+                   <button type="button" onclick="Companies.setHistoryThisMonth()" class="px-2 py-0.5 text-[10px] font-black uppercase bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-all cursor-pointer">This Month</button>
+                </div>
+
+                <!-- Annual controls -->
+                <div id="history-annual-controls" class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 hidden shadow-2xs">
+                   <select id="history-year-picker" onchange="Companies.filterHistory()" class="bg-transparent border-0 px-2 py-0.5 text-xs font-bold text-slate-700 outline-none cursor-pointer">
+                   </select>
+                </div>
+              </div>
+
+              <!-- Search input -->
+              <div class="relative w-64 shrink-0">
+                  <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                  <input type="text" id="history-search" oninput="Companies.filterHistory()" placeholder="Search invoice, amount..." class="w-full pl-9 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent transition-all text-xs font-bold shadow-2xs">
+                  <button type="button" id="history-search-clear-btn" onclick="Companies.clearHistorySearch()" title="Clear search" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-all cursor-pointer hidden"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
           </div>
           
           <div class="overflow-y-auto flex-1 p-0">
@@ -411,6 +479,7 @@ window.Companies = {
               </tbody>
             </table>
           </div>
+          <div id="history-pagination-footer" class="shrink-0"></div>
           
           <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end shrink-0">
             <button onclick="Companies.hideHistoryModal()" class="px-6 py-1.5 bg-slate-800 text-white font-bold rounded-xl transition-all active:scale-95">Close</button>
@@ -494,8 +563,11 @@ window.Companies = {
                       </div>
                       
                       <div class="flex gap-3">
-                          <button type="button" onclick="Companies.hideNewPurchaseModal()" class="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors text-sm cursor-pointer">Cancel</button>
-                          <button type="button" onclick="Companies.confirmAndCompletePurchase(event)" id="np-submit-print-btn" class="flex-1 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer">
+                          <button type="button" onclick="Companies.hideNewPurchaseModal()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors text-xs cursor-pointer">Cancel</button>
+                          <button type="button" onclick="Companies.confirmAndCompletePurchase(event, false)" id="np-save-only-btn" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                              <i data-lucide="check" class="w-4 h-4"></i> <span id="np-save-only-text">Save</span>
+                          </button>
+                          <button type="button" onclick="Companies.confirmAndCompletePurchase(event, true)" id="np-submit-print-btn" class="flex-1 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-wider text-xs flex items-center justify-center gap-2 cursor-pointer">
                               <i data-lucide="printer" class="w-4 h-4"></i> <span id="np-submit-print-text">Complete & Print (F9)</span>
                           </button>
                       </div>
@@ -541,6 +613,7 @@ window.Companies = {
               </tbody>
             </table>
           </div>
+          <div id="all-txns-pagination-footer" class="shrink-0"></div>
           
           <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end shrink-0">
             <button onclick="Companies.hideAllTxnsModal()" class="px-6 py-2 bg-slate-900 text-white font-bold rounded-xl transition-all active:scale-95 uppercase tracking-widest text-xs">Close Log</button>
@@ -995,18 +1068,136 @@ window.Companies = {
 
     this.currentHistory = transactions;
     this.currentHistoryCompanyId = companyId;
+    this.historyPage = 1;
+    this.currentHistoryPeriod = 'all';
+    this.historyTypeFilter = 'all';
     
     // Reset filters
     const searchInput = document.getElementById('history-search');
     if (searchInput) searchInput.value = '';
-    const timeFilter = document.getElementById('history-time-filter');
-    if (timeFilter) timeFilter.value = 'all';
+    const typeSelect = document.getElementById('history-type-select');
+    if (typeSelect) typeSelect.value = 'all';
 
-    this.renderHistoryList(transactions);
+    this.initHistoryPeriodPickers();
+    this.setHistoryPeriodType('all');
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     if (window.lucide) lucide.createIcons();
+  },
+
+  setHistoryPeriodType(type) {
+    this.currentHistoryPeriod = type;
+    const periods = ['day', 'month', 'year', 'all'];
+    periods.forEach(p => {
+      const btn = document.getElementById(`history-period-${p}`);
+      if (btn) {
+        if (p === type) {
+          btn.className = 'px-2.5 py-1 text-[11px] font-black rounded-md transition-all bg-white shadow-sm text-slate-800 cursor-pointer';
+        } else {
+          btn.className = 'px-2.5 py-1 text-[11px] font-black rounded-md transition-all text-slate-500 hover:text-slate-800 cursor-pointer';
+        }
+      }
+    });
+
+    const dailyEl = document.getElementById('history-daily-controls');
+    const monthlyEl = document.getElementById('history-monthly-controls');
+    const annualEl = document.getElementById('history-annual-controls');
+
+    if (dailyEl) dailyEl.classList.toggle('hidden', type !== 'day');
+    if (monthlyEl) monthlyEl.classList.toggle('hidden', type !== 'month');
+    if (annualEl) annualEl.classList.toggle('hidden', type !== 'year');
+
+    this.historyPage = 1;
+    this.filterHistory();
+  },
+
+  setHistoryTypeFilter(type) {
+    this.historyTypeFilter = type;
+    this.historyPage = 1;
+    this.filterHistory();
+  },
+
+  changeHistoryDateStep(delta) {
+    const input = document.getElementById('history-date-picker');
+    if (!input) return;
+    const cur = input.value ? new Date(input.value) : new Date();
+    cur.setDate(cur.getDate() + delta);
+    input.value = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+    this.historyPage = 1;
+    this.filterHistory();
+  },
+
+  setHistoryToday() {
+    const input = document.getElementById('history-date-picker');
+    if (input) {
+      const now = new Date();
+      input.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      this.historyPage = 1;
+      this.filterHistory();
+    }
+  },
+
+  changeHistoryMonthStep(delta) {
+    const mSelect = document.getElementById('history-month-select');
+    const ySelect = document.getElementById('history-month-year-select');
+    if (!mSelect || !ySelect) return;
+    let m = parseInt(mSelect.value) + delta;
+    let y = parseInt(ySelect.value);
+    if (m > 12) { m = 1; y += 1; }
+    else if (m < 1) { m = 12; y -= 1; }
+    let yOpt = Array.from(ySelect.options).find(o => parseInt(o.value) === y);
+    if (!yOpt) {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      ySelect.appendChild(opt);
+    }
+    mSelect.value = String(m);
+    ySelect.value = String(y);
+    this.historyPage = 1;
+    this.filterHistory();
+  },
+
+  setHistoryThisMonth() {
+    const now = new Date();
+    const mSelect = document.getElementById('history-month-select');
+    const ySelect = document.getElementById('history-month-year-select');
+    if (mSelect) mSelect.value = String(now.getMonth() + 1);
+    if (ySelect) ySelect.value = String(now.getFullYear());
+    this.historyPage = 1;
+    this.filterHistory();
+  },
+
+  initHistoryPeriodPickers() {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yearSet = new Set([now.getFullYear()]);
+    (this.currentHistory || []).forEach(t => {
+      if (t.date) {
+        const parsed = this.parseTxnDate(t.date);
+        if (parsed && parsed.year) yearSet.add(parsed.year);
+      }
+    });
+    const years = Array.from(yearSet).sort((a, b) => b - a);
+
+    const datePicker = document.getElementById('history-date-picker');
+    if (datePicker && !datePicker.value) datePicker.value = todayStr;
+
+    const mSelect = document.getElementById('history-month-select');
+    if (mSelect) mSelect.value = String(now.getMonth() + 1);
+
+    const mySelect = document.getElementById('history-month-year-select');
+    if (mySelect) {
+      mySelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+      mySelect.value = String(now.getFullYear());
+    }
+
+    const ySelect = document.getElementById('history-year-picker');
+    if (ySelect) {
+      ySelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+      ySelect.value = String(now.getFullYear());
+    }
   },
 
   clearHistorySearch() {
@@ -1015,6 +1206,7 @@ window.Companies = {
       input.value = '';
       input.focus();
     }
+    this.historyPage = 1;
     this.filterHistory();
   },
 
@@ -1024,54 +1216,88 @@ window.Companies = {
     const query = (searchInput?.value || '').toLowerCase().trim();
 
     if (clearBtn) {
-      if ((searchInput?.value || '').length > 0) clearBtn.classList.remove('hidden');
+      if (query.length > 0) clearBtn.classList.remove('hidden');
       else clearBtn.classList.add('hidden');
     }
 
-    const timeFilter = document.getElementById('history-time-filter')?.value || 'all';
     if (!this.currentHistory) return;
 
-    let filtered = this.currentHistory;
+    const typeFilter = document.getElementById('history-type-select')?.value || this.historyTypeFilter || 'all';
+    this.historyTypeFilter = typeFilter;
+    const selDate = document.getElementById('history-date-picker')?.value;
 
-    // Apply Time Filter
-    if (timeFilter === 'month') {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        filtered = filtered.filter(t => new Date(t.date) >= startOfMonth);
-    }
+    let filtered = this.currentHistory.filter((t, idx) => {
+      if (typeFilter !== 'all' && t.type !== typeFilter) return false;
 
-    filtered = filtered.filter((t, idx) => {
+      // Period filter
+      if (t.date && this.currentHistoryPeriod !== 'all') {
+        const parsed = this.parseTxnDate(t.date);
+        if (parsed) {
+          if (this.currentHistoryPeriod === 'day' && selDate) {
+            if (parsed.dateStr !== selDate) return false;
+          } else if (this.currentHistoryPeriod === 'month') {
+            const targetM = parseInt(document.getElementById('history-month-select')?.value);
+            const targetY = parseInt(document.getElementById('history-month-year-select')?.value);
+            if (targetM && targetY) {
+              if (parsed.year !== targetY || parsed.month !== targetM) return false;
+            }
+          } else if (this.currentHistoryPeriod === 'year') {
+            const targetY = parseInt(document.getElementById('history-year-picker')?.value);
+            if (targetY) {
+              if (parsed.year !== targetY) return false;
+            }
+          }
+        }
+      }
+
+      if (query) {
         let invoiceId = '';
         if (t.invoice_no) {
-            invoiceId = `${t.invoice_prefix || (this.currentTab === 'companies' ? 'CMP' : 'INV')}-${t.invoice_no}`.toLowerCase();
+          invoiceId = `${t.invoice_prefix || (this.currentTab === 'companies' ? 'CMP' : 'INV')}-${t.invoice_no}`.toLowerCase();
         } else {
-            const invNo = this.currentHistory.length - idx;
-            const invPrefix = this.currentTab === 'companies' ? 'CMP' : 'INV';
-            invoiceId = `${invPrefix}-${invNo}`.toLowerCase();
+          const invNo = this.currentHistory.length - idx;
+          const invPrefix = this.currentTab === 'companies' ? 'CMP' : 'INV';
+          invoiceId = `${invPrefix}-${invNo}`.toLowerCase();
         }
-        
         return invoiceId.includes(query) || 
-               t.amount.toString().includes(query) ||
+               (t.amount && t.amount.toString().includes(query)) ||
                (t.description && t.description.toLowerCase().includes(query));
+      }
+
+      return true;
     });
 
     this.renderHistoryList(filtered);
   },
 
   renderHistoryList(transactions) {
+    this._lastFilteredHistory = transactions || [];
     const tbody = document.getElementById('history-list');
+    const footer = document.getElementById('history-pagination-footer');
     const companyId = this.currentHistoryCompanyId;
+    if (!tbody) return;
     
-    if (transactions.length === 0) {
+    if (!transactions || transactions.length === 0) {
         tbody.innerHTML = `
             <tr>
               <td colspan="5" class="px-6 py-12 text-center text-slate-300 font-bold italic">No matching transactions found.</td>
             </tr>
         `;
+        if (footer) footer.innerHTML = '';
+        if (window.lucide) lucide.createIcons();
         return;
     }
 
-    tbody.innerHTML = transactions.map((t) => {
+    const total = transactions.length;
+    const totalPages = Math.ceil(total / this.historyPageSize);
+    if (this.historyPage > totalPages) this.historyPage = totalPages;
+    if (this.historyPage < 1) this.historyPage = 1;
+
+    const startIdx = (this.historyPage - 1) * this.historyPageSize;
+    const endIdx = Math.min(startIdx + this.historyPageSize, total);
+    const paginated = transactions.slice(startIdx, endIdx);
+
+    tbody.innerHTML = paginated.map((t) => {
         let displayInvoice = '';
         if (t.invoice_no) {
             displayInvoice = `${t.invoice_prefix || (this.currentTab === 'companies' ? 'CMP' : 'INV')}-${t.invoice_no}`;
@@ -1102,14 +1328,19 @@ window.Companies = {
             </td>
             <td class="px-4 py-1 text-right font-medium">
                 <div class="flex items-center justify-end gap-1.5 transition-opacity">
-                    <button onclick="Companies.viewTxnDetails('${t.id}', ${companyId})" class="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="View Details">
+                    <button onclick="Companies.viewTxnDetails('${t.id}', ${companyId})" class="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all cursor-pointer" title="View Details">
                         <i data-lucide="eye" class="w-4 h-4"></i>
                     </button>
-                    <button onclick="Companies.printVoucher('${t.id}', ${companyId})" class="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all" title="Print Voucher">
+                    <button onclick="Companies.printVoucher('${t.id}', ${companyId})" class="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer" title="Print Voucher">
                         <i data-lucide="printer" class="w-4 h-4"></i>
                     </button>
+                    ${t.type === 'purchase' ? `
+                    <button onclick="Companies.editPurchase('${t.id}', ${companyId})" class="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-all cursor-pointer" title="Edit Purchase">
+                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    </button>
+                    ` : ''}
                     ${t.id === this.currentHistory[0]?.id ? `
-                    <button onclick="Companies.handleDeleteTransaction('${t.id}', ${companyId})" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="Delete Transaction">
+                    <button onclick="Companies.handleDeleteTransaction('${t.id}', ${companyId})" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="Delete Transaction">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                     ` : ''}
@@ -1117,7 +1348,44 @@ window.Companies = {
             </td>
         </tr>
     `}).join('');
+
+    if (footer) {
+      if (total <= this.historyPageSize) {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-6 py-2 bg-slate-50 border-t border-slate-100 text-xs font-bold text-slate-500">
+            <span>Showing all <span class="font-black text-slate-800">${total}</span> transaction${total === 1 ? '' : 's'}</span>
+          </div>
+        `;
+      } else {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-6 py-2 bg-slate-50 border-t border-slate-100 text-xs font-bold text-slate-600 flex-wrap gap-2 select-none">
+            <div>
+              Showing <span class="font-black text-slate-900">${startIdx + 1}</span> - <span class="font-black text-slate-900">${endIdx}</span> of <span class="font-black text-slate-900">${total}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" ${this.historyPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Companies.changeHistoryPage(' + (this.historyPage - 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                <span>Prev</span>
+              </button>
+              <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-800 font-black">
+                Page ${this.historyPage} of ${totalPages}
+              </span>
+              <button type="button" ${this.historyPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Companies.changeHistoryPage(' + (this.historyPage + 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <span>Next</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
     if (window.lucide) lucide.createIcons();
+  },
+
+  changeHistoryPage(page) {
+    this.historyPage = page;
+    this.renderHistoryList(this._lastFilteredHistory || []);
   },
 
   hideHistoryModal() {
@@ -1166,15 +1434,28 @@ window.Companies = {
   },
 
   renderAllTxnsList(txns) {
+    this._lastFilteredAllTxns = txns || [];
     const tbody = document.getElementById('all-txns-list');
+    const footer = document.getElementById('all-txns-pagination-footer');
     if (!tbody) return;
 
-    if (txns.length === 0) {
+    if (!txns || txns.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-slate-300 font-bold italic">No transactions found.</td></tr>`;
+        if (footer) footer.innerHTML = '';
+        if (window.lucide) lucide.createIcons();
         return;
     }
 
-    tbody.innerHTML = txns.map(t => {
+    const total = txns.length;
+    const totalPages = Math.ceil(total / this.allTxnsPageSize);
+    if (this.allTxnsPage > totalPages) this.allTxnsPage = totalPages;
+    if (this.allTxnsPage < 1) this.allTxnsPage = 1;
+
+    const startIdx = (this.allTxnsPage - 1) * this.allTxnsPageSize;
+    const endIdx = Math.min(startIdx + this.allTxnsPageSize, total);
+    const paginated = txns.slice(startIdx, endIdx);
+
+    tbody.innerHTML = paginated.map(t => {
         const invPrefix = t.invoice_prefix || (this.currentTab === 'companies' ? 'CMP' : 'INV');
         const displayInvoice = t.invoice_no ? `${invPrefix}-${t.invoice_no}` : 'Legacy';
         
@@ -1204,7 +1485,44 @@ window.Companies = {
             </tr>
         `;
     }).join('');
+
+    if (footer) {
+      if (total <= this.allTxnsPageSize) {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-6 py-2 bg-slate-50 border-t border-slate-100 text-xs font-bold text-slate-500">
+            <span>Showing all <span class="font-black text-slate-800">${total}</span> transaction${total === 1 ? '' : 's'}</span>
+          </div>
+        `;
+      } else {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-6 py-2 bg-slate-50 border-t border-slate-100 text-xs font-bold text-slate-600 flex-wrap gap-2 select-none">
+            <div>
+              Showing <span class="font-black text-slate-900">${startIdx + 1}</span> - <span class="font-black text-slate-900">${endIdx}</span> of <span class="font-black text-slate-900">${total}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" ${this.allTxnsPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Companies.changeAllTxnsPage(' + (this.allTxnsPage - 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                <span>Prev</span>
+              </button>
+              <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-800 font-black">
+                Page ${this.allTxnsPage} of ${totalPages}
+              </span>
+              <button type="button" ${this.allTxnsPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Companies.changeAllTxnsPage(' + (this.allTxnsPage + 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <span>Next</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
     if (window.lucide) lucide.createIcons();
+  },
+
+  changeAllTxnsPage(page) {
+    this.allTxnsPage = page;
+    this.renderAllTxnsList(this._lastFilteredAllTxns || []);
   },
 
   clearAllTxnsSearch() {
@@ -1213,6 +1531,7 @@ window.Companies = {
       input.value = '';
       input.focus();
     }
+    this.allTxnsPage = 1;
     this.filterAllTxns();
   },
 
@@ -1228,6 +1547,7 @@ window.Companies = {
 
     if (!this.fullTxnHistory) return;
     
+    this.allTxnsPage = 1;
     const filtered = this.fullTxnHistory.filter(t => {
         const invPrefix = t.invoice_prefix || (this.currentTab === 'companies' ? 'CMP' : 'INV');
         const displayInvoice = t.invoice_no ? `${invPrefix}-${t.invoice_no}` : 'Legacy';
@@ -1775,15 +2095,18 @@ window.Companies = {
       });
     }
 
+    this.txnsPage = 1;
     this.renderTransactionsList(filtered);
     this.updateTransactionsStats(filtered);
   },
 
   renderTransactionsList(txns) {
+    this._lastFilteredTxns = txns || [];
     const tbody = document.getElementById('main-txns-list');
+    const footer = document.getElementById('txns-pagination-footer');
     if (!tbody) return;
 
-    if (txns.length === 0) {
+    if (!txns || txns.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-bold italic">
@@ -1794,11 +2117,21 @@ window.Companies = {
           </td>
         </tr>
       `;
+      if (footer) footer.innerHTML = '';
       if (window.lucide) lucide.createIcons();
       return;
     }
 
-    tbody.innerHTML = txns.map(t => {
+    const total = txns.length;
+    const totalPages = Math.ceil(total / this.txnsPageSize);
+    if (this.txnsPage > totalPages) this.txnsPage = totalPages;
+    if (this.txnsPage < 1) this.txnsPage = 1;
+
+    const startIdx = (this.txnsPage - 1) * this.txnsPageSize;
+    const endIdx = Math.min(startIdx + this.txnsPageSize, total);
+    const paginated = txns.slice(startIdx, endIdx);
+
+    tbody.innerHTML = paginated.map(t => {
       const invPrefix = t.invoice_prefix || (this.currentTab === 'companies' ? 'CMP' : 'INV');
       const displayInvoice = t.invoice_no ? `${invPrefix}-${t.invoice_no}` : 'Legacy';
 
@@ -1826,13 +2159,18 @@ window.Companies = {
           </td>
           <td class="px-4 py-1 text-right font-medium">
             <div class="flex items-center justify-end gap-1.5 transition-opacity">
-              <button onclick="Companies.viewTxnDetails('${t.id}', ${t.entityId})" class="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="View Details">
+              <button onclick="Companies.viewTxnDetails('${t.id}', ${t.entityId})" class="p-1.5 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer" title="View Details">
                 <i data-lucide="eye" class="w-4 h-4"></i>
               </button>
-              <button onclick="Companies.printVoucher('${t.id}', ${t.entityId})" class="p-1.5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Print Voucher">
+              <button onclick="Companies.printVoucher('${t.id}', ${t.entityId})" class="p-1.5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer" title="Print Voucher">
                 <i data-lucide="printer" class="w-4 h-4"></i>
               </button>
-              <button onclick="Companies.handleDeleteTransaction('${t.id}', ${t.entityId})" class="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Delete Transaction">
+              ${t.type === 'purchase' ? `
+              <button onclick="Companies.editPurchase('${t.id}', ${t.entityId})" class="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all cursor-pointer" title="Edit Purchase">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+              </button>
+              ` : ''}
+              <button onclick="Companies.handleDeleteTransaction('${t.id}', ${t.entityId})" class="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="Delete Transaction">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
               </button>
             </div>
@@ -1841,7 +2179,43 @@ window.Companies = {
       `;
     }).join('');
 
+    if (footer) {
+      if (total <= this.txnsPageSize) {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs font-bold text-slate-500">
+            <span>Showing all <span class="font-black text-slate-800">${total}</span> transaction${total === 1 ? '' : 's'}</span>
+          </div>
+        `;
+      } else {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs font-bold text-slate-600 flex-wrap gap-2 select-none">
+            <div>
+              Showing <span class="font-black text-slate-900">${startIdx + 1}</span> - <span class="font-black text-slate-900">${endIdx}</span> of <span class="font-black text-slate-900">${total}</span> transactions
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" ${this.txnsPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Companies.changeTxnsPage(' + (this.txnsPage - 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                <span>Prev</span>
+              </button>
+              <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-800 font-black">
+                Page ${this.txnsPage} of ${totalPages}
+              </span>
+              <button type="button" ${this.txnsPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Companies.changeTxnsPage(' + (this.txnsPage + 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <span>Next</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
     if (window.lucide) lucide.createIcons();
+  },
+
+  changeTxnsPage(page) {
+    this.txnsPage = page;
+    this.renderTransactionsList(this._lastFilteredTxns || []);
   },
 
   showNewPurchaseModal(companyId = null) {
@@ -1947,6 +2321,9 @@ window.Companies = {
   },
 
   hideNewPurchaseModal() {
+    this.editingTxn = null;
+    this.editingCompanyId = null;
+    this._paidAmountUserModified = false;
     const modal = document.getElementById('new-purchase-modal');
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -1954,6 +2331,8 @@ window.Companies = {
     if (modalTitle) modalTitle.textContent = 'New Purchase';
     const submitPrintText = document.getElementById('np-submit-print-text');
     if (submitPrintText) submitPrintText.textContent = 'Complete & Print (F9)';
+    const saveOnlyText = document.getElementById('np-save-only-text');
+    if (saveOnlyText) saveOnlyText.textContent = 'Save';
     const selectEl = document.getElementById('np-company-select');
     if (selectEl) selectEl.disabled = false;
 
@@ -1963,45 +2342,165 @@ window.Companies = {
     }
   },
 
-  addPurchaseRow() {
+  async editPurchase(txnId, companyId) {
+    const isDirect = !companyId || companyId === 0 || companyId === '0';
+    const txnKey = isDirect ? `${this.currentTab}-direct-transactions` : `companies-${companyId}-transactions`;
+    let transactions = window.storage.get(txnKey) || [];
+    let txn = transactions.find(t => t.id === txnId);
+
+    if (!txn && this.fullTxnHistory) {
+      txn = this.fullTxnHistory.find(t => t.id === txnId);
+    }
+    if (!txn && this.dataList) {
+      for (const comp of this.dataList) {
+        const list = window.storage.get(`companies-${comp.id}-transactions`) || [];
+        txn = list.find(t => t.id === txnId);
+        if (txn) {
+          companyId = comp.id;
+          break;
+        }
+      }
+    }
+    if (!txn) {
+      const directTxns = window.storage.get(`${this.currentTab}-direct-transactions`) || [];
+      txn = directTxns.find(t => t.id === txnId);
+      if (txn) companyId = 0;
+    }
+
+    if (!txn) {
+      return app.showAlert("Transaction not found.");
+    }
+    if (txn.type !== 'purchase') {
+      return app.showAlert("Only purchase transactions can be edited.");
+    }
+
+    this.editingTxn = JSON.parse(JSON.stringify(txn));
+    this.editingCompanyId = (companyId !== undefined && companyId !== null) ? companyId : (txn.entityId || 0);
+    this._paidAmountUserModified = true;
+
+    const modal = document.getElementById('new-purchase-modal');
+    const list = document.getElementById('np-items-list');
+    const totalEl = document.getElementById('np-grand-total');
+    const targetLabel = document.getElementById('np-target-company');
+    const idInput = document.getElementById('np-company-id');
+    const selectEl = document.getElementById('np-company-select');
+    const modalTitle = document.getElementById('np-modal-title');
+    const submitPrintText = document.getElementById('np-submit-print-text');
+    const saveOnlyText = document.getElementById('np-save-only-text');
+
+    document.getElementById('new-purchase-form').reset();
+    list.innerHTML = '';
+    totalEl.textContent = 'Rs. 0';
+
+    const invPrefix = txn.invoice_prefix || 'CMP';
+    const displayInvoice = txn.invoice_no ? `${invPrefix}-${txn.invoice_no}` : txn.id;
+    if (modalTitle) modalTitle.textContent = `Edit Purchase (${displayInvoice})`;
+    if (submitPrintText) submitPrintText.textContent = 'Update & Print';
+    if (saveOnlyText) saveOnlyText.textContent = 'Update Purchase';
+
+    // Populate company selector dropdown
+    if (selectEl) {
+      selectEl.disabled = false;
+      selectEl.innerHTML = `
+        <option value="">-- Choose Supplier (Optional) --</option>
+        ${(this.dataList || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+      `;
+      const targetCid = (companyId && companyId !== '0' && companyId !== 0) ? String(companyId) : (txn.entityId ? String(txn.entityId) : '');
+      selectEl.value = targetCid;
+    }
+
+    const cId = parseInt(selectEl?.value);
+    const company = cId ? (this.dataList || []).find(c => c.id === cId) : null;
+    if (company) {
+      if (idInput) idInput.value = company.id;
+      if (targetLabel) targetLabel.textContent = `Supplier: ${company.name}`;
+    } else {
+      if (idInput) idInput.value = '';
+      if (targetLabel) targetLabel.textContent = 'No Supplier (Optional)';
+    }
+
+    // Populate rows with existing items
+    if (txn.items && txn.items.length > 0) {
+      txn.items.forEach(item => {
+        this.addPurchaseRow(item);
+      });
+    } else {
+      this.addPurchaseRow();
+    }
+
+    // Populate discount & paid amount
+    const discountInput = document.getElementById('np-discount');
+    if (discountInput) discountInput.value = (txn.discount && txn.discount > 0) ? txn.discount : '';
+
+    const paidInput = document.getElementById('np-paid-amount');
+    if (paidInput) paidInput.value = (txn.paid !== undefined && txn.paid !== null && txn.paid > 0) ? txn.paid : '';
+
+    this.calculateNewTxnTotal();
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (window.lucide) lucide.createIcons();
+
+    if (this._modalKeyHandler) {
+      window.removeEventListener('keydown', this._modalKeyHandler);
+    }
+    this._modalKeyHandler = (e) => this.handleModalGlobalKeyDown(e);
+    window.addEventListener('keydown', this._modalKeyHandler);
+  },
+
+  addPurchaseRow(itemData = null) {
     const list = document.getElementById('np-items-list');
     const rowId = Date.now() + Math.random().toString(36).substr(2, 4);
     const div = document.createElement('div');
     div.id = `row-${rowId}`;
     div.className = 'np-purchase-row grid grid-cols-12 gap-2 items-center group animate-in slide-in-from-left-2 duration-150 py-1 border-b border-slate-100 last:border-none';
+
+    const nameVal = itemData ? (itemData.name || '') : '';
+    const qtyVal = itemData ? (itemData.qty !== undefined ? itemData.qty : '') : '';
+    const costVal = itemData ? (itemData.box_cost !== undefined ? itemData.box_cost : (itemData.price !== undefined ? itemData.price : '')) : '';
+    const itemIdVal = itemData ? (itemData.item_id || itemData.id || '') : '';
+    const slugVal = itemData ? (itemData.slug || '') : '';
+    const unitVal = itemData ? (itemData.unit || 'pcs') : 'pcs';
+    const hasValue = !!nameVal;
+    const isSelected = hasValue && (!!itemIdVal || !!slugVal);
+
     div.innerHTML = `
         <div class="col-span-6 relative">
             <input type="text" placeholder="Item Name / Details" 
+                   value="${nameVal ? nameVal.replace(/"/g, '&quot;') : ''}"
+                   ${isSelected ? 'disabled' : ''}
                    onclick="Companies.handleItemSearch(this)" 
                    onfocus="Companies.handleItemSearch(this)" 
                    oninput="Companies.handleItemSearch(this); Companies.calculateNewTxnTotal();" 
                    onkeydown="Companies.handlePurchaseRowKeyDown(event, this, 'name')"
-                   class="np-item-name w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:bg-white focus:border-accent outline-none transition-all font-bold">
+                   class="np-item-name w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs focus:bg-white focus:border-accent outline-none transition-all font-bold ${isSelected ? 'bg-slate-100 text-slate-700 font-black' : ''}">
             <div class="np-search-results hidden absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl z-[550] max-h-52 overflow-y-auto"></div>
-            <button type="button" onclick="Companies.clearItemSearch(this)" class="np-clear-btn hidden absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-rose-500 transition-colors">
+            <button type="button" onclick="Companies.clearItemSearch(this)" class="np-clear-btn ${hasValue ? '' : 'hidden'} absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer">
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
             </button>
-            <input type="hidden" class="np-item-id">
-            <input type="hidden" class="np-item-slug">
-            <input type="hidden" class="np-item-unit" value="pcs">
+            <input type="hidden" class="np-item-id" value="${itemIdVal}">
+            <input type="hidden" class="np-item-slug" value="${slugVal}">
+            <input type="hidden" class="np-item-unit" value="${unitVal}">
             <input type="hidden" class="np-item-original-stock">
             <input type="hidden" class="np-item-old-boxes" value="0">
         </div>
         <div class="col-span-2">
             <input type="number" placeholder="Qty" min="0.01" step="any" 
+                   value="${qtyVal}"
                    oninput="Companies.calculateNewTxnTotal()" 
                    onkeydown="Companies.handlePurchaseRowKeyDown(event, this, 'qty')"
                    class="np-item-qty w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-xs font-black focus:bg-white focus:border-accent outline-none transition-all tabular-nums text-center">
         </div>
         <div class="col-span-2">
             <input type="number" placeholder="Cost / Unit" min="0" step="any" 
+                   value="${costVal}"
                    oninput="Companies.calculateNewTxnTotal()" 
                    onkeydown="Companies.handlePurchaseRowKeyDown(event, this, 'cost')"
                    class="np-item-cost w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-xs font-black focus:bg-white focus:border-accent outline-none transition-all tabular-nums text-right">
         </div>
         <div class="col-span-2 flex items-center justify-end gap-1.5">
             <span class="np-item-line-total text-xs font-black text-slate-800 tabular-nums">Rs. 0</span>
-            <button type="button" onclick="this.closest('.np-purchase-row').remove(); Companies.calculateNewTxnTotal();" class="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all shrink-0" title="Remove Row">
+            <button type="button" onclick="this.closest('.np-purchase-row').remove(); Companies.calculateNewTxnTotal();" class="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all shrink-0 cursor-pointer" title="Remove Row">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
         </div>
@@ -2075,7 +2574,7 @@ window.Companies = {
                 <span class="text-[11px] font-black text-slate-800 uppercase tracking-tight truncate">${item.item_name} ${item.company_name ? `<span class="text-blue-600 font-bold ml-1">(${item.company_name})</span>` : ''}</span>
                 <div class="flex gap-1.5 items-center shrink-0">
                   <span class="text-[10px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded whitespace-nowrap">Rs. ${(item.cost_price || 0).toLocaleString()} / ${itemUnit}</span>
-                  <span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">${stockQty} ${itemUnit}</span>
+                  <span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">${app.formatQty(stockQty)} ${itemUnit}</span>
                 </div>
             </div>
             ${item.description ? `<p class="text-[10px] text-slate-400 font-medium truncate">${item.description}</p>` : ''}
@@ -2115,7 +2614,7 @@ window.Companies = {
     if (idInput) idInput.value = item.id;
     if (slugInput) slugInput.value = item.slug;
     if (unitInput) unitInput.value = item.unit || 'pcs';
-    if (stockInput) stockInput.value = item.current_stock || 0;
+    if (stockInput) stockInput.value = app.formatQty(item.current_stock || 0);
     if (oldBoxesInput) oldBoxesInput.value = '0';
 
     if (qtyInput) {
@@ -2493,10 +2992,45 @@ window.Companies = {
         submitPrintBtn.style.opacity = isReady ? '1' : '0.5';
         submitPrintBtn.style.cursor = isReady ? 'pointer' : 'not-allowed';
     }
+    const saveOnlyBtn = document.getElementById('np-save-only-btn');
+    if (saveOnlyBtn) {
+        saveOnlyBtn.disabled = !isReady;
+        saveOnlyBtn.style.opacity = isReady ? '1' : '0.5';
+        saveOnlyBtn.style.cursor = isReady ? 'pointer' : 'not-allowed';
+    }
   },
 
-  async confirmAndCompletePurchase(e) {
+  async confirmAndCompletePurchase(e, andPrint = true) {
     if (e) e.preventDefault();
+    if (this.editingTxn) {
+      const selectEl = document.getElementById('np-company-select');
+      const idInput = document.getElementById('np-company-id');
+      const companyId = parseInt(idInput?.value || selectEl?.value);
+      const company = (companyId && !isNaN(companyId)) ? (this.dataList || []).find(c => c.id === companyId) : null;
+      const supplierDisplayName = company ? company.name : 'Direct Purchase';
+
+      const invPrefix = this.editingTxn.invoice_prefix || 'CMP';
+      const invDisplay = this.editingTxn.invoice_no ? `${invPrefix}-${this.editingTxn.invoice_no}` : '';
+
+      app.showConfirm({
+        title: 'Update Purchase',
+        message: `
+          <div class="text-slate-600 text-sm">
+            Are you sure you want to save changes to Purchase <span class="font-black text-slate-900">${invDisplay}</span>?
+          </div>
+          <div class="mt-2 text-xs text-slate-500 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+            Stock quantities and supplier balance will be recalculated and updated accordingly.
+          </div>
+        `,
+        confirmText: andPrint ? 'Update & Print' : 'Update Purchase',
+        confirmColor: 'amber',
+        onConfirm: async () => {
+          await this.submitEditedPurchase(null, andPrint);
+        }
+      });
+      return;
+    }
+
     const selectEl = document.getElementById('np-company-select');
     const idInput = document.getElementById('np-company-id');
     const companyId = parseInt(idInput?.value || selectEl?.value);
@@ -2586,10 +3120,10 @@ window.Companies = {
           </div>` : ''}
         </div>
       `,
-      confirmText: 'Complete & Print',
+      confirmText: andPrint ? 'Complete & Print' : 'Complete Purchase',
       confirmColor: 'green',
       onConfirm: async () => {
-        await this.submitNewPurchase(null, true);
+        await this.submitNewPurchase(null, andPrint);
       }
     });
   },
@@ -2755,6 +3289,221 @@ window.Companies = {
     }
   },
 
+  async submitEditedPurchase(e, andPrint = false) {
+    if (e) e.preventDefault();
+    if (!this.editingTxn) return;
+
+    const oldTxn = this.editingTxn;
+    const oldCompanyId = (this.editingCompanyId !== undefined && this.editingCompanyId !== null) ? this.editingCompanyId : (oldTxn.entityId || 0);
+
+    const selectEl = document.getElementById('np-company-select');
+    const idInput = document.getElementById('np-company-id');
+    const newCompanyId = parseInt(idInput?.value || selectEl?.value) || 0;
+    const rows = document.querySelectorAll('#np-items-list > div');
+    
+    const newCompany = (newCompanyId && !isNaN(newCompanyId)) ? (this.dataList || []).find(c => c.id === newCompanyId) : null;
+    const isDirect = !newCompany;
+    const supplierDisplayName = newCompany ? newCompany.name : 'Direct Purchase';
+
+    let subtotal = 0;
+    const details = [];
+    const itemsData = [];
+
+    rows.forEach(row => {
+        const nameInput = row.querySelector('.np-item-name');
+        const qtyInput = row.querySelector('.np-item-qty') || row.querySelector('.np-item-cartons');
+        const costInput = row.querySelector('.np-item-cost') || row.querySelector('.np-item-carton-cost') || row.querySelector('.np-item-price');
+        const idInput = row.querySelector('.np-item-id');
+        const slugInput = row.querySelector('.np-item-slug');
+        const unitInput = row.querySelector('.np-item-unit');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+        const boxCost = parseFloat(costInput ? costInput.value : 0) || 0;
+        const unit = unitInput ? (unitInput.value || 'pcs') : 'pcs';
+        
+        if (name && qty > 0 && boxCost > 0) {
+            const lineTotal = qty * boxCost;
+
+            details.push(`${name} (${qty} ${unit.toUpperCase()} @ Rs. ${boxCost.toLocaleString()}/${unit})`);
+            itemsData.push({ 
+                name, 
+                qty,
+                unit,
+                price: boxCost,
+                box_cost: boxCost, 
+                lineTotal,
+                item_id: idInput ? idInput.value : '',
+                slug: slugInput ? slugInput.value : ''
+            });
+            subtotal += lineTotal;
+        }
+    });
+
+    if (itemsData.length === 0 || subtotal <= 0) {
+        return app.showAlert("Please add at least one item with quantity and price.");
+    }
+
+    const discountEl = document.getElementById('np-discount');
+    let discount = parseFloat(discountEl?.value) || 0;
+    discount = Math.max(0, Math.min(discount, subtotal));
+
+    const finalTotal = Math.max(0, subtotal - discount);
+
+    const paidEl = document.getElementById('np-paid-amount');
+    let paidAmount = parseFloat(paidEl?.value) || 0;
+    paidAmount = Math.max(0, Math.min(paidAmount, finalTotal));
+
+    app.showLoading();
+    try {
+        // 1. Stock Adjustments (Delta between old items and new items)
+        const deltaMap = new Map();
+
+        // Old items in purchase: subtract their qty from stock delta
+        (oldTxn.items || []).forEach(item => {
+            const pId = item.item_id || item.id;
+            const slug = item.slug;
+            if (pId && slug) {
+                const key = `${slug}:::${pId}`;
+                const entry = deltaMap.get(key) || { slug, id: pId, deltaQty: 0, cost: 0, name: item.name };
+                entry.deltaQty -= (parseFloat(item.qty) || 0);
+                deltaMap.set(key, entry);
+            }
+        });
+
+        // New items in purchase: add their qty to stock delta & capture new cost
+        itemsData.forEach(item => {
+            const pId = item.item_id || item.id;
+            const slug = item.slug;
+            if (pId && slug) {
+                const key = `${slug}:::${pId}`;
+                const entry = deltaMap.get(key) || { slug, id: pId, deltaQty: 0, cost: item.box_cost, name: item.name };
+                entry.deltaQty += (parseFloat(item.qty) || 0);
+                entry.cost = item.box_cost;
+                deltaMap.set(key, entry);
+            }
+        });
+
+        // Apply changes to database products
+        for (const [key, info] of deltaMap.entries()) {
+            try {
+                const products = await window.api.getProducts(info.slug);
+                const prod = (products || []).find(p => String(p.id) === String(info.id));
+                if (prod) {
+                    const currentStock = Number(prod.current_stock) || 0;
+                    const updatedStock = Math.round(Math.max(0, currentStock + info.deltaQty) * 100) / 100;
+                    const updatePayload = { current_stock: updatedStock };
+                    if (info.cost > 0) {
+                        updatePayload.cost_price = info.cost;
+                        updatePayload.wholesale_cost_price = info.cost;
+                    }
+                    await window.api.updateProduct(info.slug, info.id, updatePayload);
+                }
+            } catch (err) {
+                console.warn(`Could not adjust stock for ${info.name}:`, err);
+            }
+        }
+
+        // 2. Adjust Supplier Balance
+        const oldNetImpact = (oldTxn.amount || 0) - (oldTxn.paid || 0);
+        const newNetImpact = finalTotal - paidAmount;
+        let newBalance = undefined;
+
+        const oldIsDirect = !oldCompanyId || oldCompanyId === 0 || oldCompanyId === '0';
+        if (String(oldCompanyId) === String(newCompanyId)) {
+            if (newCompany) {
+                const balanceDiff = newNetImpact - oldNetImpact;
+                newBalance = (newCompany.amount || 0) + balanceDiff;
+                await window.api.saveCompany({ ...newCompany, amount: newBalance });
+            }
+        } else {
+            // Supplier changed!
+            if (!oldIsDirect) {
+                const oldComp = (this.dataList || []).find(c => String(c.id) === String(oldCompanyId));
+                if (oldComp) {
+                    const reverted = (oldComp.amount || 0) - oldNetImpact;
+                    await window.api.saveCompany({ ...oldComp, amount: reverted });
+                }
+            }
+            if (newCompany) {
+                newBalance = (newCompany.amount || 0) + newNetImpact;
+                await window.api.saveCompany({ ...newCompany, amount: newBalance });
+            }
+        }
+
+        // 3. Update Transaction Record in storage
+        const updatedTxn = {
+            ...oldTxn,
+            amount: finalTotal,
+            subtotal: subtotal,
+            discount: discount,
+            paid: paidAmount,
+            entityName: supplierDisplayName,
+            entityId: newCompany ? newCompany.id : 0,
+            description: details.join(', ') + 
+                (discount > 0 ? ` (Discount: ${app.formatCurrency(discount)})` : '') + 
+                (paidAmount > 0 ? ` (Paid: ${app.formatCurrency(paidAmount)})` : ''),
+            items: itemsData,
+            balanceAfter: newCompany ? newBalance : undefined
+        };
+
+        const oldTxnKey = oldIsDirect ? `${this.currentTab}-direct-transactions` : `companies-${oldCompanyId}-transactions`;
+        const newTxnKey = isDirect ? `${this.currentTab}-direct-transactions` : `companies-${newCompany.id}-transactions`;
+
+        if (oldTxnKey === newTxnKey) {
+            const transactions = window.storage.get(oldTxnKey) || [];
+            const idx = transactions.findIndex(t => t.id === oldTxn.id);
+            if (idx !== -1) {
+                transactions[idx] = updatedTxn;
+            } else {
+                transactions.unshift(updatedTxn);
+            }
+            window.storage.set(oldTxnKey, transactions);
+        } else {
+            let oldTxns = window.storage.get(oldTxnKey) || [];
+            oldTxns = oldTxns.filter(t => t.id !== oldTxn.id);
+            window.storage.set(oldTxnKey, oldTxns);
+
+            const newTxns = window.storage.get(newTxnKey) || [];
+            newTxns.unshift(updatedTxn);
+            window.storage.set(newTxnKey, newTxns);
+        }
+
+        // 4. Reset editing state & close modal
+        this.editingTxn = null;
+        this.editingCompanyId = null;
+        this.hideNewPurchaseModal();
+
+        // 5. Refresh UI
+        if (this.currentView === 'transactions') {
+            await this.loadTransactions();
+        } else {
+            await this.loadCompanies();
+        }
+
+        const histModal = document.getElementById('history-modal');
+        if (histModal && !histModal.classList.contains('hidden')) {
+            const reloadId = newCompany ? newCompany.id : (oldIsDirect ? null : oldCompanyId);
+            if (reloadId) await this.showHistory(reloadId);
+        }
+
+        if (andPrint) {
+            await this.viewTxnDetails(updatedTxn.id, newCompany ? newCompany.id : 0);
+        } else {
+            app.showAlert({
+                title: 'Purchase Updated',
+                message: `Purchase invoice #${updatedTxn.invoice_no} has been updated successfully.`,
+                type: 'success'
+            });
+        }
+    } catch (err) {
+        console.error("Error updating purchase:", err);
+        app.showAlert("Error updating purchase: " + err.message);
+    } finally {
+        app.hideLoading();
+    }
+  },
+
   async printVoucher(txnId, companyId) {
     const isDirect = !companyId || companyId === 0 || companyId === '0';
     const company = isDirect ? { id: 0, name: 'Direct Purchase', phone: '' } : this.dataList.find(c => c.id === companyId);
@@ -2784,13 +3533,17 @@ window.Companies = {
 
         const rowHtml = items.map((item, i) => {
             const isLast = i === items.length - 1;
+            const qVal = item.qty || item.total_boxes || 1;
+            let uStr = (item.unit || '').trim().toUpperCase();
+            if (uStr === 'PCS' && Math.abs(Number(qVal)) === 1) uStr = 'PC';
+            const unitSuffix = uStr ? ` ${uStr}` : '';
             return `
             <tr style="border-bottom: ${isLast ? 'none' : '1px solid #000'}; font-size: 10.5px;">
                 <td style="padding: 3px 2px; text-align: center; font-weight: 700; border-right: 1px solid #000;">${i + 1}</td>
                 <td style="padding: 3px 4px; text-align: left; font-weight: 800; word-break: break-word; line-height: 1.25; border-right: 1px solid #000;">
                     ${item.name}
                 </td>
-                <td style="padding: 3px 2px; text-align: center; font-weight: 800; white-space: nowrap; border-right: 1px solid #000;">${item.qty || item.total_boxes || 1}</td>
+                <td style="padding: 3px 2px; text-align: center; font-weight: 800; white-space: nowrap; border-right: 1px solid #000;">${app.formatQty(qVal)}${unitSuffix}</td>
                 <td style="padding: 3px 3px; text-align: right; font-weight: 600; white-space: nowrap; border-right: 1px solid #000;">${app.formatAmount(item.box_cost || item.price || item.carton_cost)}</td>
                 <td style="padding: 3px 4px; text-align: right; font-weight: 800; white-space: nowrap;">${app.formatAmount(item.lineTotal || item.price)}</td>
             </tr>
@@ -2801,12 +3554,9 @@ window.Companies = {
             <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace, sans-serif; color: #000; box-sizing: border-box; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
                 <!-- Header -->
                 <div style="text-align: center; margin-bottom: 4px;">
-                    <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-                    <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-                    <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-                        <div>M.Ishaq: 0301-2630481</div>
-                        <div>Ch. Shakir: 0300-5074410</div>
-                    </div>
+                    <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${settings.company_name || 'NH DOORS'}</h1>
+                    <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${settings.address || 'Taxila'}</div>
+                    ${settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
                     <div style="margin-top: 5px;">
                         <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">PURCHASE RECEIPT / VOUCHER</span>
                     </div>
@@ -2923,13 +3673,17 @@ window.Companies = {
 
         const rowHtml = items.map((item, i) => {
             const isLast = i === items.length - 1;
+            const qVal = item.qty || item.total_boxes || 1;
+            let uStr = (item.unit || '').trim().toUpperCase();
+            if (uStr === 'PCS' && Math.abs(Number(qVal)) === 1) uStr = 'PC';
+            const unitSuffix = uStr ? ` ${uStr}` : '';
             return `
             <tr style="border-bottom: ${isLast ? 'none' : '1px solid #000'}; font-size: 10.5px;">
                 <td style="padding: 3px 2px; text-align: center; font-weight: 700; border-right: 1px solid #000;">${i + 1}</td>
                 <td style="padding: 3px 4px; text-align: left; font-weight: 800; word-break: break-word; line-height: 1.25; border-right: 1px solid #000;">
                     ${item.name}
                 </td>
-                <td style="padding: 3px 2px; text-align: center; font-weight: 800; white-space: nowrap; border-right: 1px solid #000;">${item.qty || item.total_boxes || 1}</td>
+                <td style="padding: 3px 2px; text-align: center; font-weight: 800; white-space: nowrap; border-right: 1px solid #000;">${app.formatQty(qVal)}${unitSuffix}</td>
                 <td style="padding: 3px 3px; text-align: right; font-weight: 600; white-space: nowrap; border-right: 1px solid #000;">${app.formatAmount(item.box_cost || item.price || item.carton_cost)}</td>
                 <td style="padding: 3px 4px; text-align: right; font-weight: 800; white-space: nowrap;">${app.formatAmount(item.lineTotal || item.price)}</td>
             </tr>
@@ -2940,12 +3694,9 @@ window.Companies = {
             <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace, sans-serif; color: #000; box-sizing: border-box; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
                 <!-- Header -->
                 <div style="text-align: center; margin-bottom: 4px;">
-                    <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-                    <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-                    <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-                        <div>M.Ishaq: 0301-2630481</div>
-                        <div>Ch. Shakir: 0300-5074410</div>
-                    </div>
+                    <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${settings.company_name || 'NH DOORS'}</h1>
+                    <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${settings.address || 'Taxila'}</div>
+                    ${settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
                     <div style="margin-top: 5px;">
                         <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">PURCHASE RECEIPT / VOUCHER</span>
                     </div>

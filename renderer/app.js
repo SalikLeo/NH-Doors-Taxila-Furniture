@@ -241,7 +241,7 @@ const app = {
     allPanels.forEach(p => p.classList.add('hidden'));
 
     let panel = document.getElementById(`tab-panel-${page}`);
-    const isNew = !panel;
+    const isNew = !panel || panel.children.length === 0 || !panel.innerHTML.trim();
     const hasSpecificArgs = Boolean(args && (args.id || args.reset || Object.keys(args).length > 0));
 
     // If user was editing a sale in proposal-form and now clicks "New Sale" without an edit ID, reset to new sale
@@ -270,18 +270,30 @@ const app = {
 
     if (isNew || hasSpecificArgs || editingSaleToNewSale) {
       // Route to corresponding module to render
-      switch(page) {
-        case 'dashboard': (window.Dashboard || Dashboard).render(panel); break;
-        case 'proposals': (window.Proposals || Proposals).render(panel); break;
-        case 'customers': (window.Customers || Customers).render(panel); break;
-        case 'item-sales': (window.ItemSales || ItemSales).render(panel, args); break;
-        case 'proposal-form': (window.SalesForm || SalesForm).render(panel, editingSaleToNewSale ? { reset: true } : args); break;
-        case 'master-db': (window.MasterDB || MasterDB).render(panel); break;
-        case 'rate-list': (window.RateList || RateList).render(panel, args); break;
-        case 'expenses': (window.Expenses || Expenses).render(panel); break;
-        case 'companies': (window.Companies || Companies).render(panel); break;
-        case 'reports': (window.Reports || Reports).render(panel); break;
-        case 'settings': (window.Settings || Settings).render(panel); break;
+      try {
+        switch(page) {
+          case 'dashboard': (window.Dashboard || Dashboard).render(panel); break;
+          case 'proposals': (window.Proposals || Proposals).render(panel); break;
+          case 'customers': (window.Customers || Customers).render(panel); break;
+          case 'item-sales': (window.ItemSales || ItemSales).render(panel, args); break;
+          case 'proposal-form': (window.SalesForm || SalesForm).render(panel, editingSaleToNewSale ? { reset: true } : args); break;
+          case 'master-db': {
+            const m = window.MasterDB || (typeof MasterDB !== 'undefined' ? MasterDB : null);
+            if (m && typeof m.render === 'function') {
+              Promise.resolve(m.render(panel)).catch(err => {
+                console.error('[MasterDB render error]:', err);
+              });
+            }
+            break;
+          }
+          case 'rate-list': (window.RateList || RateList).render(panel, args); break;
+          case 'expenses': (window.Expenses || Expenses).render(panel); break;
+          case 'companies': (window.Companies || Companies).render(panel); break;
+          case 'reports': (window.Reports || Reports).render(panel); break;
+          case 'settings': (window.Settings || Settings).render(panel); break;
+        }
+      } catch (renderErr) {
+        console.error(`[navigate render error for ${page}]:`, renderErr);
       }
     } else {
       // Returning to an already-rendered tab without clearing state!
@@ -297,10 +309,17 @@ const app = {
         Expenses.loadData();
       } else if (page === 'companies' && window.Companies && typeof Companies.loadCompanies === 'function') {
         Companies.loadCompanies();
-      } else if (page === 'proposal-form' && window.SalesForm && typeof SalesForm.refreshStockIndicators === 'function') {
-        SalesForm.refreshStockIndicators();
-      } else if (page === 'master-db' && window.MasterDB && typeof MasterDB.loadData === 'function') {
-        MasterDB.loadData();
+      } else if (page === 'proposal-form') {
+        const sf = window.SalesForm || (typeof SalesForm !== 'undefined' ? SalesForm : null);
+        if (sf) {
+          if (typeof sf.refreshStockIndicators === 'function') sf.refreshStockIndicators();
+          if (typeof sf.loadCustomers === 'function') sf.loadCustomers();
+        }
+      } else if (page === 'master-db') {
+        const m = window.MasterDB || (typeof MasterDB !== 'undefined' ? MasterDB : null);
+        if (m && typeof m.loadData === 'function') {
+          m.loadData();
+        }
       }
     }
     
@@ -712,7 +731,7 @@ const app = {
   },
 
   formatCurrency(amount) {
-    const num = Number(amount || 0);
+    const num = Math.round((Number(amount || 0)) * 100) / 100;
     const hasDecimals = (num % 1) !== 0;
     return num.toLocaleString('en-IN', { 
       style: 'currency', 
@@ -723,7 +742,7 @@ const app = {
   },
 
   formatNumber(amount) {
-    const num = Number(amount || 0);
+    const num = Math.round((Number(amount || 0)) * 100) / 100;
     const hasDecimals = (num % 1) !== 0;
     return num.toLocaleString('en-IN', { 
       minimumFractionDigits: hasDecimals ? 2 : 0, 
@@ -732,17 +751,28 @@ const app = {
   },
 
   formatAmount(amount) {
-    return Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    const num = Math.round((Number(amount || 0)) * 100) / 100;
+    const hasDecimals = (num % 1) !== 0;
+    return num.toLocaleString('en-IN', { 
+      minimumFractionDigits: hasDecimals ? 2 : 0, 
+      maximumFractionDigits: 2 
+    });
+  },
+
+  formatQty(val) {
+    if (val === null || val === undefined || val === '') return '0';
+    const num = Math.round((Number(val) || 0) * 100) / 100;
+    return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   },
 
   formatStock(totalBoxes) {
-    const boxes = parseInt(totalBoxes) || 0;
-    return `${boxes} Bx`;
+    const boxes = Math.round((Number(totalBoxes) || 0) * 100) / 100;
+    return `${this.formatQty(boxes)} Bx`;
   },
 
   formatStockShort(totalBoxes) {
-    const boxes = parseInt(totalBoxes) || 0;
-    return `${boxes}`;
+    const boxes = Math.round((Number(totalBoxes) || 0) * 100) / 100;
+    return `${this.formatQty(boxes)}`;
   },
 
   parseStockBoxes(boxes) {

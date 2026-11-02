@@ -229,10 +229,10 @@ const Settings = {
 
   async reloadSettings() {
     const s = await window.api.getSettings();
-    if (document.getElementById('set-name')) document.getElementById('set-name').value = s.company_name || 'Ishaq Jadoon Traders';
+    if (document.getElementById('set-name')) document.getElementById('set-name').value = s.company_name || 'NH Doors';
     if (document.getElementById('set-web')) document.getElementById('set-web').value = s.website || '';
-    if (document.getElementById('set-address')) document.getElementById('set-address').value = s.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt';
-    if (document.getElementById('set-phone')) document.getElementById('set-phone').value = s.phone || 'M.Ishaq 0301-2630481, Ch. Shakir 0300-5074410';
+    if (document.getElementById('set-address')) document.getElementById('set-address').value = s.address || 'Taxila';
+    if (document.getElementById('set-phone')) document.getElementById('set-phone').value = s.phone || '';
     this.originalLogo = s.logo_path || '';
     this.updateLogoPreview(this.originalLogo);
 
@@ -354,10 +354,10 @@ const Settings = {
     try {
       const currentSettings = (await window.api.getSettings()) || {};
       const data = {
-        company_name: document.getElementById('set-name')?.value || currentSettings.company_name || 'Ishaq Jadoon Traders',
+        company_name: document.getElementById('set-name')?.value || currentSettings.company_name || 'NH Doors',
         website: document.getElementById('set-web')?.value || '',
-        address: document.getElementById('set-address')?.value || currentSettings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt',
-        phone: document.getElementById('set-phone')?.value || currentSettings.phone || '03095369472, 03299934620',
+        address: document.getElementById('set-address')?.value || currentSettings.address || 'Taxila',
+        phone: document.getElementById('set-phone')?.value || currentSettings.phone || '',
         logo_path: document.getElementById('set-logo-path')?.value || '',
         qr_path: '',
         qr_text: ''

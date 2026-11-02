@@ -5,6 +5,9 @@ const Customers = window.Customers = {
   selectedCustomerId: null,
   editingCustomerId: null,
   filterType: 'all',
+  ledgerPage: 1,
+  ledgerPageSize: 50,
+  currentLedgerHistory: [],
 
   async render(container) {
     container.innerHTML = `
@@ -193,7 +196,7 @@ const Customers = window.Customers = {
                 </tbody>
               </table>
             </div>
-
+            <div id="right-ledger-pagination-footer" class="shrink-0"></div>
           </div>
 
         </div>
@@ -285,6 +288,11 @@ const Customers = window.Customers = {
       this.applyFilters();
       const customer = this.customers.find(c => c.id === this.selectedCustomerId);
       this.renderRightLedger(customer || null);
+
+      // Keep SalesForm customer list in sync immediately
+      if (window.SalesForm && typeof SalesForm.loadCustomers === 'function') {
+        SalesForm.loadCustomers();
+      }
     } catch (e) {
       console.error(e);
       app.showAlert("Error loading customers data.");
@@ -455,6 +463,7 @@ const Customers = window.Customers = {
 
   selectCustomer(id) {
     this.selectedCustomerId = id;
+    this.ledgerPage = 1;
     this.renderList();
     const customer = this.customers.find(c => c.id === id);
     this.renderRightLedger(customer);
@@ -467,6 +476,7 @@ const Customers = window.Customers = {
     const actionsEl = document.getElementById('right-ledger-actions');
     const metricsEl = document.getElementById('right-ledger-metrics');
     const tbody = document.getElementById('right-ledger-tbody');
+    const footer = document.getElementById('right-ledger-pagination-footer');
 
     if (!customer) {
       if (custNameEl) custNameEl.textContent = 'No Customer Selected';
@@ -474,6 +484,7 @@ const Customers = window.Customers = {
       if (custAddrEl) custAddrEl.textContent = 'Add or select a customer to view their transactions';
       if (actionsEl) actionsEl.classList.add('hidden');
       if (metricsEl) metricsEl.classList.add('hidden');
+      if (footer) footer.innerHTML = '';
       if (tbody) {
         tbody.innerHTML = `
           <tr>
@@ -570,6 +581,8 @@ const Customers = window.Customers = {
 
     if (!tbody) return;
 
+    this.currentLedgerHistory = uniqueHistory;
+
     if (uniqueHistory.length === 0) {
       tbody.innerHTML = `
         <tr>
@@ -580,14 +593,25 @@ const Customers = window.Customers = {
           </td>
         </tr>
       `;
+      if (footer) footer.innerHTML = '';
     } else {
-      tbody.innerHTML = uniqueHistory.map((item, idx) => {
+      const total = uniqueHistory.length;
+      const totalPages = Math.ceil(total / this.ledgerPageSize);
+      if (this.ledgerPage > totalPages) this.ledgerPage = totalPages;
+      if (this.ledgerPage < 1) this.ledgerPage = 1;
+
+      const startIdx = (this.ledgerPage - 1) * this.ledgerPageSize;
+      const endIdx = Math.min(startIdx + this.ledgerPageSize, total);
+      const paginated = uniqueHistory.slice(startIdx, endIdx);
+
+      tbody.innerHTML = paginated.map((item, idx) => {
+        const rowNum = startIdx + idx + 1;
         const isInvoice = item.type === 'Invoice';
         const hasDue = item.due > 0.01;
 
         return `
         <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-200">
-          <td class="py-2.5 px-3 font-bold text-slate-400 text-center border-r border-slate-200 tabular-nums">${idx + 1}</td>
+          <td class="py-2.5 px-3 font-bold text-slate-400 text-center border-r border-slate-200 tabular-nums">${rowNum}</td>
           <td class="py-2.5 px-3 font-semibold text-slate-700 whitespace-nowrap border-r border-slate-200">${app.formatDateTime(item.date)}</td>
           <td class="py-2.5 px-3 font-black text-slate-900 border-r border-slate-200 whitespace-nowrap">
             <span class="${item.type === 'Payment' ? 'text-emerald-700' : 'text-slate-900'}">${item.ref}</span>
@@ -630,9 +654,46 @@ const Customers = window.Customers = {
           </td>
         </tr>
       `;}).join('');
+
+      if (footer) {
+        if (total <= this.ledgerPageSize) {
+          footer.innerHTML = `
+            <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs font-bold text-slate-500">
+              <span>Showing all <span class="font-black text-slate-800">${total}</span> transaction${total === 1 ? '' : 's'}</span>
+            </div>
+          `;
+        } else {
+          footer.innerHTML = `
+            <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs font-bold text-slate-600 flex-wrap gap-2 select-none">
+              <div>
+                Showing <span class="font-black text-slate-900">${startIdx + 1}</span> - <span class="font-black text-slate-900">${endIdx}</span> of <span class="font-black text-slate-900">${total}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" ${this.ledgerPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Customers.changeLedgerPage(' + (this.ledgerPage - 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                  <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                  <span>Prev</span>
+                </button>
+                <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-800 font-black">
+                  Page ${this.ledgerPage} of ${totalPages}
+                </span>
+                <button type="button" ${this.ledgerPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Customers.changeLedgerPage(' + (this.ledgerPage + 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                  <span>Next</span>
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+      }
     }
 
     if (window.lucide) lucide.createIcons();
+  },
+
+  changeLedgerPage(page) {
+    this.ledgerPage = page;
+    const customer = this.customers.find(c => c.id === this.selectedCustomerId);
+    this.renderRightLedger(customer);
   },
 
   async markSalePaid(proposalId, refStr, txnId, billed = 0, alreadyReceived = 0, dueAmount = 0) {
@@ -672,7 +733,7 @@ const Customers = window.Customers = {
 
     app.showPaymentModal({
       title: 'Receive Invoice Payment',
-      subtitle: `Invoice #${cleanRef}${custName ? ' • ' + custName : ''}`,
+      subtitle: `Invoice #${cleanRef}${custName ? ' â€¢ ' + custName : ''}`,
       total: totalBilled,
       alreadyReceived: receivedSoFar,
       buttonText: 'Receive & Settle',
@@ -1028,7 +1089,7 @@ const Customers = window.Customers = {
             message: `Successfully received <b>${app.formatCurrency(amountReceived)}</b> via ${method || 'Cash'}.<br><br>` +
                      `<b>Settlement Details (Oldest to Newest):</b><br>` +
                      (settledInvoices.length > 0 
-                       ? settledInvoices.map(s => `• <b>${s.ref}</b>: Paid Rs. ${Math.round(s.applied)} ${s.remainingDue <= 0 ? '<span class="text-emerald-600 font-bold">(Fully Settled)</span>' : `<span class="text-rose-600 font-bold">(Remaining Due: Rs. ${Math.round(s.remainingDue)})</span>`}`).join('<br>')
+                       ? settledInvoices.map(s => `â€¢ <b>${s.ref}</b>: Paid Rs. ${Math.round(s.applied)} ${s.remainingDue <= 0 ? '<span class="text-emerald-600 font-bold">(Fully Settled)</span>' : `<span class="text-rose-600 font-bold">(Remaining Due: Rs. ${Math.round(s.remainingDue)})</span>`}`).join('<br>')
                        : 'Applied to overall Khata balance.') +
                      `<br><br>Remaining Khata Balance: <b>${app.formatCurrency(newBalance)}</b>.`
           });
@@ -1053,12 +1114,9 @@ const Customers = window.Customers = {
       <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #000; font-size: 11px; line-height: 1.35; box-sizing: border-box;">
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 4px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">${settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-          <div style="font-size: 10.5px; font-weight: 600; line-height: 1.25;">${settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-          <div style="font-size: 10.5px; font-weight: 700; line-height: 1.3; margin-top: 2px;">
-            <div>M.Ishaq: 0301-2630481</div>
-            <div>Ch. Shakir: 0300-5074410</div>
-          </div>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">${settings.company_name || 'NH DOORS'}</h1>
+          <div style="font-size: 10.5px; font-weight: 600; line-height: 1.25;">${settings.address || 'Taxila'}</div>
+          ${settings.phone ? `<div style="font-size: 10.5px; font-weight: 700; line-height: 1.3; margin-top: 2px;">${settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
           <div style="margin-top: 5px;">
             <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 12px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">CUSTOMER KHATA SLIP</span>
           </div>
@@ -1085,7 +1143,7 @@ const Customers = window.Customers = {
       </div>
     `;
 
-    app.showPreview(html, `Khata Slip: ${c.name}`, `80MM THERMAL RECEIPT • ${c.name.toUpperCase()}`);
+    app.showPreview(html, `Khata Slip: ${c.name}`, `80MM THERMAL RECEIPT â€¢ ${c.name.toUpperCase()}`);
   },
 
   async printSummaryReport() {
@@ -1113,12 +1171,9 @@ const Customers = window.Customers = {
     const html = `
       <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #000; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
         <div style="text-align: center; margin-bottom: 4px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-          <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-            <div>M.Ishaq: 0301-2630481</div>
-            <div>Ch. Shakir: 0300-5074410</div>
-          </div>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${settings.company_name || 'NH DOORS'}</h1>
+          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${settings.address || 'Taxila'}</div>
+          ${settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
           <div style="margin-top: 5px;">
             <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">CUSTOMERS KHATA BALANCES</span>
           </div>
@@ -1150,6 +1205,6 @@ const Customers = window.Customers = {
       </div>
     `;
 
-    app.showPreview(html, 'Customers Khata Balances', `80MM THERMAL RECEIPT • ${list.length} CUSTOMERS`);
+    app.showPreview(html, 'Customers Khata Balances', `80MM THERMAL RECEIPT â€¢ ${list.length} CUSTOMERS`);
   }
 };

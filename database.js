@@ -10,13 +10,33 @@ function init(customPath = null) {
   if (customPath) {
     dbPath = customPath;
   } else if (app && typeof app.getPath === 'function') {
-    dbPath = path.join(app.getPath('userData'), 'ishaq_jadoon.db');
+    const userDir = app.getPath('userData');
+    if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
+    dbPath = path.join(userDir, 'nh_doors.db');
+    
+    // Auto-migration from older DB if new DB doesn't exist yet
+    if (!fs.existsSync(dbPath)) {
+      const oldPathSameDir = path.join(userDir, 'ishaq_jadoon.db');
+      const appData = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME, 'Library/Application Support') : path.join(process.env.HOME, '.config'));
+      const oldPathOldDir = path.join(appData, 'ishaq-jadoon-traders', 'ishaq_jadoon.db');
+      if (fs.existsSync(oldPathSameDir)) {
+        try { fs.copyFileSync(oldPathSameDir, dbPath); } catch(e) {}
+      } else if (fs.existsSync(oldPathOldDir)) {
+        try { fs.copyFileSync(oldPathOldDir, dbPath); } catch(e) {}
+      }
+    }
   } else {
     const fs = require('fs');
     const appData = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME, 'Library/Application Support') : path.join(process.env.HOME, '.config'));
-    const dir = path.join(appData, 'ishaq-jadoon-traders');
+    const dir = path.join(appData, 'nh-doors');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    dbPath = path.join(dir, 'ishaq_jadoon.db');
+    dbPath = path.join(dir, 'nh_doors.db');
+    if (!fs.existsSync(dbPath)) {
+      const oldDbPath = path.join(appData, 'ishaq-jadoon-traders', 'ishaq_jadoon.db');
+      if (fs.existsSync(oldDbPath)) {
+        try { fs.copyFileSync(oldDbPath, dbPath); } catch(e) {}
+      }
+    }
   }
 
   db = new Database(dbPath);
@@ -127,6 +147,13 @@ function createTables() {
           db.exec(`ALTER TABLE ${tableName} ADD COLUMN pieces_per_carton INTEGER DEFAULT NULL`);
         } catch(e) {}
     }
+  });
+
+  // Ensure stock floats are clean (never more than 2 decimals)
+  productTables.forEach(row => {
+    try {
+      db.exec(`UPDATE ${row.name} SET current_stock = ROUND(current_stock, 2) WHERE current_stock IS NOT NULL`);
+    } catch(e) {}
   });
 
   // Performance Indexes
@@ -366,36 +393,43 @@ function seedInitialData() {
   try {
     // Ensure default company settings
     const existingCompany = db.prepare("SELECT value FROM settings WHERE key = 'company_name'").get();
-    if (!existingCompany || !existingCompany.value || existingCompany.value === 'Ultimate Marketing' || existingCompany.value.toLowerCase().includes('baba') || existingCompany.value.toLowerCase().includes('waziristan')) {
-      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('company_name', ?)").run('Ishaq Jadoon Traders');
+    if (!existingCompany || !existingCompany.value || existingCompany.value === 'Ultimate Marketing' || existingCompany.value.toLowerCase().includes('baba') || existingCompany.value.toLowerCase().includes('waziristan') || existingCompany.value.toLowerCase().includes('ishaq') || existingCompany.value.toLowerCase().includes('jadoon')) {
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('company_name', ?)").run('NH Doors');
     }
-    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('address', ?)").run('Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt');
+    
+    // Address
+    const existingAddr = db.prepare("SELECT value FROM settings WHERE key = 'address'").get();
+    if (!existingAddr || !existingAddr.value || existingAddr.value.includes('Barrier 3') || existingAddr.value.includes('Wah Cantt')) {
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('address', ?)").run('Taxila');
+    }
     
     // Check phone
     const existingPhone = db.prepare("SELECT value FROM settings WHERE key = 'phone'").get();
-    if (!existingPhone || !existingPhone.value || existingPhone.value.includes('0312') || existingPhone.value.includes('Kaleem') || existingPhone.value.includes('03095369472')) {
-      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('phone', ?)").run('M.Ishaq 0301-2630481, Ch. Shakir 0300-5074410');
+    if (!existingPhone || !existingPhone.value || existingPhone.value.includes('0312') || existingPhone.value.includes('Kaleem') || existingPhone.value.includes('03095369472') || existingPhone.value.includes('Ishaq') || existingPhone.value.includes('0301-2630481')) {
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('phone', ?)").run('');
     }
 
-    // Clean up stale logo if it belongs to Baba Waziristan or temporary downloads
+    // Clean up stale logo if it belongs to Baba Waziristan or temporary downloads or old stores
     const existingLogo = db.prepare("SELECT value FROM settings WHERE key = 'logo_path'").get();
     if (existingLogo && existingLogo.value && (
       existingLogo.value.toLowerCase().includes('baba') ||
       existingLogo.value.toLowerCase().includes('waziristan') ||
+      existingLogo.value.toLowerCase().includes('ishaq') ||
+      existingLogo.value.toLowerCase().includes('jadoon') ||
       existingLogo.value.toLowerCase().includes('downloads\\logo.jpg') ||
       existingLogo.value.toLowerCase().includes('downloads/logo.jpg')
     )) {
       db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('logo_path', ?)").run('');
     }
 
-    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('tagline', ?)").run('Wholesale & Retail General Merchants');
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('tagline', ?)").run('Doors & Furniture');
 
     // Default auto backup directory in Documents
     const defaultBackupDir = (app && typeof app.getPath === 'function') 
-      ? path.join(app.getPath('documents'), 'Ishaq Jadoon Traders Backups')
-      : path.join(require('os').homedir(), 'Documents', 'Ishaq Jadoon Traders Backups');
+      ? path.join(app.getPath('documents'), 'NH Doors Backups')
+      : path.join(require('os').homedir(), 'Documents', 'NH Doors Backups');
     const existingBackupDir = db.prepare("SELECT value FROM settings WHERE key = 'auto_backup_dir'").get();
-    if (!existingBackupDir || !existingBackupDir.value) {
+    if (!existingBackupDir || !existingBackupDir.value || existingBackupDir.value.includes('Ishaq Jadoon Traders Backups')) {
       db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_backup_dir', ?)").run(defaultBackupDir);
     }
     try {
@@ -604,7 +638,12 @@ function getProducts(category, companyId = null) {
   }
   
   sql += ` ORDER BY p.id DESC`;
-  return db.prepare(sql).all(...params);
+  try {
+    return db.prepare(sql).all(...params);
+  } catch (e) {
+    console.warn(`[getProducts] error querying products_${category}:`, e.message);
+    return [];
+  }
 }
 
 function findProductByName(itemName, excludeCategory = null, excludeId = null) {
@@ -647,6 +686,9 @@ function addProduct(category, data) {
     }
   }
 
+  if (data.current_stock !== undefined) {
+    data.current_stock = Math.round((Number(data.current_stock) || 0) * 100) / 100;
+  }
   const keys = Object.keys(data);
   const values = Object.values(data);
   const placeholders = keys.map(() => '?').join(', ');
@@ -655,6 +697,9 @@ function addProduct(category, data) {
 }
 
 function updateProduct(category, id, data) {
+  if (data.current_stock !== undefined) {
+    data.current_stock = Math.round((Number(data.current_stock) || 0) * 100) / 100;
+  }
   if (data.item_name !== undefined) {
     const itemName = String(data.item_name || '').trim();
     if (itemName) {
@@ -869,11 +914,21 @@ function getFavoriteProducts() {
 }
 
 function getCategoryStats() {
+  try {
     const labels = getCategoryLabels();
     return labels.map(l => {
-        const count = db.prepare(`SELECT COUNT(*) as c FROM products_${l.slug}`).get().c || 0;
-        return { ...l, count };
+      let count = 0;
+      try {
+        count = db.prepare(`SELECT COUNT(*) as c FROM products_${l.slug}`).get().c || 0;
+      } catch (e) {
+        console.warn(`[getCategoryStats] Failed to count products_${l.slug}:`, e.message);
+      }
+      return { ...l, count };
     });
+  } catch (err) {
+    console.error('[getCategoryStats] error:', err.message);
+    return [];
+  }
 }
 
 function addCategory(label) {
@@ -991,7 +1046,7 @@ function saveProposal(data) {
           const table = getProductTable(oldItem.section);
           if (table) {
             try {
-              db.prepare(`UPDATE ${table} SET current_stock = current_stock + ? WHERE id = ?`).run(oldItem.qty, oldItem.item_id);
+              db.prepare(`UPDATE ${table} SET current_stock = ROUND(current_stock + ?, 2) WHERE id = ?`).run(oldItem.qty, oldItem.item_id);
             } catch (stockErr) {
               console.error(`[STOCK RESTORE EDIT] Failed to restore for ${table}:`, stockErr);
             }
@@ -1021,7 +1076,7 @@ function saveProposal(data) {
             const table = getProductTable(item.section);
             if (table) {
               try {
-                db.prepare(`UPDATE ${table} SET current_stock = MAX(0, current_stock - ?) WHERE id = ?`).run(item.qty, item.item_id);
+                db.prepare(`UPDATE ${table} SET current_stock = MAX(0, ROUND(current_stock - ?, 2)) WHERE id = ?`).run(item.qty, item.item_id);
               } catch(stockErr) {
                 console.error(`[STOCK DEDUCT] Failed to deduct for ${table}:`, stockErr);
               }
@@ -1043,7 +1098,7 @@ function deleteProposal(id) {
         const table = getProductTable(item.section);
         if (table) {
           try {
-            db.prepare(`UPDATE ${table} SET current_stock = current_stock + ? WHERE id = ?`).run(item.qty, item.item_id);
+            db.prepare(`UPDATE ${table} SET current_stock = ROUND(current_stock + ?, 2) WHERE id = ?`).run(item.qty, item.item_id);
           } catch (stockErr) {
             console.error(`[STOCK RESTORE DELETE] Failed to restore for ${table}:`, stockErr);
           }
@@ -1601,10 +1656,10 @@ function deleteUnit(id) {
 
 function getDbPath() {
   if (app && typeof app.getPath === 'function') {
-    return path.join(app.getPath('userData'), 'ishaq_jadoon.db');
+    return path.join(app.getPath('userData'), 'nh_doors.db');
   }
   const appData = process.env.APPDATA || (process.platform === 'darwin' ? path.join(process.env.HOME, 'Library/Application Support') : path.join(process.env.HOME, '.config'));
-  return path.join(appData, 'ishaq-jadoon-traders', 'ishaq_jadoon.db');
+  return path.join(appData, 'nh-doors', 'nh_doors.db');
 }
 
 function close() {
@@ -1670,7 +1725,7 @@ function addProductStock(data) {
   }
   newCost = Math.round(newCost * 100) / 100;
 
-  const newStock = Math.max(0, oldStock) + inQty;
+  const newStock = Math.round((Math.max(0, oldStock) + inQty) * 100) / 100;
   const newRetail = (retailPrice !== null && retailPrice !== undefined && retailPrice !== '') 
     ? Number(retailPrice) 
     : (current.retail_price || 0);

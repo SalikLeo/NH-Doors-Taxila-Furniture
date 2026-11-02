@@ -231,12 +231,9 @@ window.Reports = {
         <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace, sans-serif; color: #000; box-sizing: border-box; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
             <!-- Header -->
             <div style="text-align: center; margin-bottom: 4px;">
-                <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-                <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-                <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-                    <div>M.Ishaq: 0301-2630481</div>
-                    <div>Ch. Shakir: 0300-5074410</div>
-                </div>
+                <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'NH DOORS'}</h1>
+                <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Taxila'}</div>
+                ${this.settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${this.settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
                 <div style="margin-top: 5px;">
                     <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">FINANCIAL REPORT &bull; ${this.reportType.toUpperCase()}</span>
                 </div>

@@ -16,10 +16,41 @@ const MasterDB = {
 
   async render(container) {
     this.displayLimit = this.pageSize;
-    // Sync units and categories from DB
-    this.settings = await window.api.getSettings();
-    this.units = await window.api.getUnits();
-    const stats = await window.api.getCategoryStats();
+
+    // Gracefully fetch settings, units, and category statistics with bulletproof fallbacks
+    try {
+      this.settings = (await window.api.getSettings()) || {};
+    } catch (e) {
+      console.warn('[MasterDB.render] getSettings error:', e);
+      this.settings = this.settings || {};
+    }
+
+    try {
+      this.units = (await window.api.getUnits()) || [];
+      if (!Array.isArray(this.units)) this.units = [];
+    } catch (e) {
+      console.warn('[MasterDB.render] getUnits error:', e);
+      this.units = this.units || [];
+    }
+
+    let stats = [];
+    try {
+      stats = (await window.api.getCategoryStats()) || [];
+      if (!Array.isArray(stats)) stats = [];
+    } catch (e) {
+      console.warn('[MasterDB.render] getCategoryStats error:', e);
+      stats = [];
+    }
+
+    if (stats.length === 0 && window.api && typeof window.api.getCategoryLabels === 'function') {
+      try {
+        const labels = (await window.api.getCategoryLabels()) || [];
+        if (Array.isArray(labels)) {
+          stats = labels.map(l => ({ ...l, count: 0 }));
+        }
+      } catch (e) {}
+    }
+
     this.sectionMap = {
         panels: 'pnl', inverters: 'inv', structures: 'str', cables: 'cab',
         breakers: 'brk', batteries: 'bat', misc: 'msc', others: 'oth'
@@ -30,19 +61,21 @@ const MasterDB = {
         this.revSectionMap[k] = k; // Map slug to itself
     });
 
-    this.categories = stats.map(s => {
-        this.labels[s.slug] = s.label;
+    this.categories = (stats || []).map(s => {
+        this.labels[s.slug] = s.label || s.slug;
         if (!this.sectionMap[s.slug]) {
             this.sectionMap[s.slug] = s.slug; 
             this.revSectionMap[s.slug] = s.slug;
         }
         return { 
             id: s.slug, 
-            label: s.label, 
-            count: s.count,
+            label: s.label || s.slug, 
+            count: s.count || 0,
             fields: ['item_name']
         };
     });
+
+    const totalAllCount = (stats || []).reduce((acc, s) => acc + (Number(s.count) || 0), 0);
 
     container.innerHTML = `
       <div class="flex justify-between items-center mb-6 gap-4 no-print flex-wrap lg:flex-nowrap">
@@ -110,7 +143,7 @@ const MasterDB = {
                 <i data-lucide="layers" class="w-3.5 h-3.5 text-amber-500 shrink-0"></i>
                 <span class="font-bold">All Items</span>
               </span>
-              <span id="count-all" class="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-200/80 px-1.5 py-0.5 rounded-md min-w-[20px] text-center">${stats.reduce((acc, s) => acc + (s.count || 0), 0)}</span>
+              <span id="count-all" class="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-200/80 px-1.5 py-0.5 rounded-md min-w-[20px] text-center">${totalAllCount}</span>
             </button>
             <div class="h-[1px] bg-slate-200 my-1"></div>
             ${this.categories.map(c => `
@@ -179,7 +212,14 @@ const MasterDB = {
               </div>
             </div>
 
-            <div class="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-100">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-100" id="db-prices-row">
+              <div id="db-last-purchase-container" class="hidden">
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <span>Last Purchase</span>
+                  <span class="text-[10px] text-slate-400 font-bold lowercase tracking-normal">(uneditable)</span>
+                </label>
+                <input type="text" id="db-last-purchase" readonly tabindex="-1" placeholder="Rs. 0" title="Last purchase price (uneditable)" class="w-full border border-slate-200 bg-slate-100 rounded-lg p-2.5 font-black text-slate-800 text-sm outline-none cursor-not-allowed tabular-nums select-all">
+              </div>
               <div>
                 <label class="block text-xs font-bold text-red-600 uppercase mb-1">Cost Price (Rs.) *</label>
                 <input type="number" id="db-cost" min="0" step="any" required placeholder="0" oninput="MasterDB.updateFormProfits()" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-accent focus:border-accent">
@@ -724,13 +764,21 @@ const MasterDB = {
 
   async loadData() {
     // Update category counts in sidebar
-    const stats = await window.api.getCategoryStats();
+    let stats = [];
+    try {
+      stats = (await window.api.getCategoryStats()) || [];
+      if (!Array.isArray(stats)) stats = [];
+    } catch (e) {
+      console.warn('[MasterDB.loadData] getCategoryStats error:', e);
+      stats = [];
+    }
+
     let totalAll = 0;
     stats.forEach(s => {
-      totalAll += (s.count || 0);
-      const cat = this.categories.find(c => c.id === s.slug);
+      totalAll += (Number(s.count) || 0);
+      const cat = (this.categories || []).find(c => c.id === s.slug);
       if (cat) {
-        cat.count = s.count;
+        cat.count = s.count || 0;
         const countSpan = document.getElementById(`count-${s.slug}`);
         if (countSpan) countSpan.textContent = s.count || 0;
       }
@@ -739,13 +787,28 @@ const MasterDB = {
     const countAllSpan = document.getElementById('count-all');
     if (countAllSpan) countAllSpan.textContent = totalAll;
 
-    this.allProducts = await window.api.getProducts(this.currentCategory);
-    this.companies = await window.api.getCompanies();
     try {
-      this.units = await window.api.getUnits();
+      this.allProducts = (await window.api.getProducts(this.currentCategory)) || [];
+      if (!Array.isArray(this.allProducts)) this.allProducts = [];
+    } catch (e) {
+      console.error('[MasterDB.loadData] getProducts error:', e);
+      this.allProducts = [];
+    }
+
+    try {
+      this.companies = (await window.api.getCompanies()) || [];
+      if (!Array.isArray(this.companies)) this.companies = [];
+    } catch (e) {
+      this.companies = [];
+    }
+
+    try {
+      this.units = (await window.api.getUnits()) || [];
+      if (!Array.isArray(this.units)) this.units = [];
     } catch(e) {
       this.units = [];
     }
+
     this.applySearch();
   },
 
@@ -902,8 +965,8 @@ const MasterDB = {
             return `<td class="px-4 py-1 font-medium text-slate-800 border-r border-slate-200 text-xs">${val}</td>`;
           }).join('')}
           <td class="px-3 py-1 text-center border-r border-slate-200 font-bold text-xs whitespace-nowrap">
-            <div class="inline-flex items-center gap-1.5 ${totalBoxes > 0 ? 'bg-amber-50/80 border border-amber-200 text-amber-950 font-black' : 'bg-rose-50 border border-rose-200 text-rose-700 font-bold'} px-2.5 py-0.5 rounded-lg shadow-sm" title="${totalBoxes} ${p.unit || 'pcs'} in stock">
-              <span>${totalBoxes}</span>
+            <div class="inline-flex items-center gap-1.5 ${totalBoxes > 0 ? 'bg-amber-50/80 border border-amber-200 text-amber-950 font-black' : 'bg-rose-50 border border-rose-200 text-rose-700 font-bold'} px-2.5 py-0.5 rounded-lg shadow-sm" title="${app.formatQty(totalBoxes)} ${p.unit || 'pcs'} in stock">
+              <span>${app.formatQty(totalBoxes)}</span>
               <span class="text-[10px] text-slate-500 font-bold uppercase">${p.unit || 'pcs'}</span>
             </div>
           </td>
@@ -951,7 +1014,7 @@ const MasterDB = {
             </td>
             ${cat.fields.slice(1).map(() => '<td class="border-r border-slate-300 bg-slate-100"></td>').join('')}
             <td class="px-3 py-2 text-center border-r border-slate-300 font-black text-xs text-amber-950 bg-amber-100/90 whitespace-nowrap">
-              ${app.formatNumber(totalStock)}
+              ${app.formatQty(totalStock)}
             </td>
             <td class="px-3 py-2 text-right border-r border-slate-300 font-bold text-xs text-slate-400 bg-slate-100">-</td>
             <td class="px-3 py-2 text-right border-r border-slate-300 font-bold text-xs text-slate-400 bg-slate-100">-</td>
@@ -978,7 +1041,7 @@ const MasterDB = {
         <div class="flex items-center gap-2 flex-wrap">
           <span>Showing <span class="text-slate-900 font-black">${current}</span> of <span class="text-slate-900 font-black">${total}</span> items</span>
           <span class="text-slate-300 mx-1">|</span>
-          <span class="text-slate-600">Total Stock: <span class="text-amber-900 font-black">${app.formatNumber(totalStock)}</span></span>
+          <span class="text-slate-600">Total Stock: <span class="text-amber-900 font-black">${app.formatQty(totalStock)}</span></span>
           <span class="text-slate-300 mx-1">|</span>
           <span class="text-slate-600">Total Value: <span class="text-purple-900 font-black">Rs. ${app.formatNumber(Math.round(totalValue))}</span></span>
         </div>
@@ -1016,6 +1079,12 @@ const MasterDB = {
     let data = dataOrId;
     if (typeof dataOrId === 'number' || typeof dataOrId === 'string') {
       data = (this.allProducts || []).find(p => p.id == dataOrId) || null;
+      if (!data && this.filteredProducts) {
+        data = this.filteredProducts.find(p => p.id == dataOrId) || null;
+      }
+      if (!data && this.rateListItems) {
+        data = this.rateListItems.find(p => p.id == dataOrId) || null;
+      }
     }
     const itemSlug = targetSlug || (data && data.slug) || (this.currentCategory !== 'all' ? this.currentCategory : (this.categories[0]?.id || 'panels'));
     this._editingCatSlug = itemSlug;
@@ -1026,6 +1095,58 @@ const MasterDB = {
     document.getElementById('db-stock').value = data ? (data.current_stock ?? '') : '';
     document.getElementById('db-cost').value = data ? data.cost_price : '';
     document.getElementById('db-retail').value = data ? data.retail_price : '';
+
+    // Handle Last Purchase field (visible only when editing an item, uneditable)
+    const lpContainer = document.getElementById('db-last-purchase-container');
+    const lpInput = document.getElementById('db-last-purchase');
+    const pricesRow = document.getElementById('db-prices-row');
+
+    if (data) {
+      if (lpContainer) lpContainer.classList.remove('hidden');
+      if (pricesRow) {
+        pricesRow.classList.remove('md:grid-cols-3');
+        pricesRow.classList.add('grid-cols-2', 'md:grid-cols-4');
+      }
+
+      // Initial price from product data (last_purchase_price or fallback to cost_price)
+      const initialPrice = (data.last_purchase_price !== null && data.last_purchase_price !== undefined && Number(data.last_purchase_price) > 0)
+        ? Number(data.last_purchase_price)
+        : (Number(data.cost_price) || 0);
+
+      if (lpInput) {
+        lpInput.value = initialPrice > 0 ? `Rs. ${app.formatQty(initialPrice)}` : 'Rs. 0';
+        lpInput.title = `Recent Purchase Price: Rs. ${app.formatQty(initialPrice)}`;
+      }
+
+      // Asynchronously query latest rate history to guarantee freshest purchase rate
+      if (data.id && window.api && window.api.getRateHistory) {
+        window.api.getRateHistory(itemSlug, data.id).then(history => {
+          const purchases = (history || []).filter(h => Number(h.purchase_price) > 0);
+          if (purchases.length > 0) {
+            const recent = purchases[0];
+            const pPrice = Number(recent.purchase_price);
+            if (lpInput) {
+              lpInput.value = `Rs. ${app.formatQty(pPrice)}`;
+              const dateStr = recent.created_at ? ` on ${app.formatDate(recent.created_at)}` : '';
+              const srcStr = recent.source ? ` (${recent.source})` : '';
+              lpInput.title = `Last purchase${dateStr} at Rs. ${app.formatQty(pPrice)}${srcStr}`;
+            }
+          }
+        }).catch(err => {
+          console.warn('[openForm] Failed to load rate history:', err);
+        });
+      }
+    } else {
+      if (lpContainer) lpContainer.classList.add('hidden');
+      if (pricesRow) {
+        pricesRow.classList.remove('grid-cols-2', 'md:grid-cols-4');
+        pricesRow.classList.add('grid-cols-1', 'md:grid-cols-3');
+      }
+      if (lpInput) {
+        lpInput.value = '';
+        lpInput.title = '';
+      }
+    }
 
     const unitSelect = document.getElementById('db-unit');
     if (unitSelect) {
@@ -2062,7 +2183,7 @@ const MasterDB = {
               ${itemCat ? `<div style="font-size: 7.5px; font-weight: normal; color: #444;">${itemCat}</div>` : ''}
             </td>
             <td style="padding: 2.5px 3px; text-align: right; color: #000; font-weight: 600; border-right: 1px solid #000;">${Number(p.retail_price || 0).toLocaleString()}</td>
-            <td style="padding: 2.5px 4px; text-align: center; color: #000; font-weight: 800;">${p.current_stock || 0}</td>
+            <td style="padding: 2.5px 4px; text-align: center; color: #000; font-weight: 800;">${app.formatQty(p.current_stock || 0)}</td>
         </tr>
       `;
     }).join('');
@@ -2071,12 +2192,9 @@ const MasterDB = {
         <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace, sans-serif; color: #000; box-sizing: border-box; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
             <!-- Header -->
             <div style="text-align: center; margin-bottom: 4px;">
-                <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-                <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-                <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-                    <div>M.Ishaq: 0301-2630481</div>
-                    <div>Ch. Shakir: 0300-5074410</div>
-                </div>
+                <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'NH DOORS'}</h1>
+                <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Taxila'}</div>
+                ${this.settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${this.settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
                 <div style="margin-top: 5px;">
                     <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">${isAll ? 'ALL ITEMS STOCK REPORT' : 'CATEGORY STOCK REPORT'}</span>
                 </div>
@@ -2284,7 +2402,7 @@ const MasterDB = {
           <tr style="border-bottom: 1px dotted #000;">
             <td style="border: 1px solid #000; padding: 2.5px 2px; font-size: 9.5px; text-align: center; color: #000; font-weight: 600; line-height: 1.25;">${idx + 1}</td>
             <td style="border: 1px solid #000; padding: 2.5px 3px; font-size: 9.5px; color: #000; font-weight: 500; word-break: break-word; line-height: 1.25;">${p.item_name || 'Unnamed Item'}</td>
-            <td style="border: 1px solid #000; padding: 2.5px 3px; font-size: 9.5px; text-align: center; color: #000; font-weight: 700; line-height: 1.25;">${p.current_stock || 0}</td>
+            <td style="border: 1px solid #000; padding: 2.5px 3px; font-size: 9.5px; text-align: center; color: #000; font-weight: 700; line-height: 1.25;">${app.formatQty(p.current_stock || 0)}</td>
           </tr>
         `).join('');
 
@@ -2292,7 +2410,7 @@ const MasterDB = {
           <div style="margin-bottom: 4px;">
             <div style="background: #000; color: #fff; padding: 2.5px 4px; font-weight: 700; font-size: 9.5px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;">
               <span>${catLabel}</span>
-              <span style="font-size: 8.5px; font-weight: 500;">${catItems.length} items &bull; ${catStockSum} Bx</span>
+              <span style="font-size: 8.5px; font-weight: 500;">${catItems.length} items &bull; ${app.formatQty(catStockSum)} Bx</span>
             </div>
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; color: #000; margin-bottom: 2px;">
               <thead>
@@ -2317,7 +2435,7 @@ const MasterDB = {
           <td style="border: 1px solid #000; padding: 2.5px 3px; font-size: 9.5px; color: #000; font-weight: 500; word-break: break-word; line-height: 1.25;">
             ${p.item_name || 'Unnamed Item'}${selectedCatIds.length > 1 ? ` <span style="font-size: 8px; color: #444; font-weight: 400;">(${this.labels[p.slug] || p.slug})</span>` : ''}
           </td>
-          <td style="border: 1px solid #000; padding: 2.5px 3px; font-size: 9.5px; text-align: center; color: #000; font-weight: 700; line-height: 1.25;">${p.current_stock || 0}</td>
+          <td style="border: 1px solid #000; padding: 2.5px 3px; font-size: 9.5px; text-align: center; color: #000; font-weight: 700; line-height: 1.25;">${app.formatQty(p.current_stock || 0)}</td>
         </tr>
       `).join('');
 
@@ -2343,12 +2461,9 @@ const MasterDB = {
       <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; background: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace, sans-serif; color: #000; box-sizing: border-box; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 4px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-          <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-            <div>M.Ishaq: 0301-2630481</div>
-            <div>Ch. Shakir: 0300-5074410</div>
-          </div>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'NH DOORS'}</h1>
+          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Taxila'}</div>
+          ${this.settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${this.settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
           <div style="margin-top: 5px;">
             <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">STOCK INVENTORY REPORT</span>
           </div>
@@ -2549,9 +2664,9 @@ const MasterDB = {
       <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; font-family: 'Courier New', Courier, monospace, system-ui; color: #000; font-size: 11px; line-height: 1.35; background: #fff; box-sizing: border-box;">
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 5px; border-bottom: 1.5px dashed #000; padding-bottom: 5px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">ISHAQ JADOON TRADERS</h1>
-          <p style="margin: 2px 0 0 0; font-size: 10px; font-weight: 700; line-height: 1.3;">Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt</p>
-          <p style="margin: 2px 0 0 0; font-size: 9.5px; font-weight: 700; line-height: 1.3;">M.Ishaq 0301-2630481 &bull; Ch. Shakir 0300-5074410</p>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">${this.settings?.company_name || 'NH DOORS'}</h1>
+          <p style="margin: 2px 0 0 0; font-size: 10px; font-weight: 700; line-height: 1.3;">${this.settings?.address || 'Taxila'}</p>
+          ${this.settings?.phone ? `<p style="margin: 2px 0 0 0; font-size: 9.5px; font-weight: 700; line-height: 1.3;">${this.settings.phone}</p>` : ''}
           <div style="margin-top: 4px; padding: 2px 0; background: #000; color: #fff; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
             RATE CHANGES AUDIT LOG
           </div>
@@ -2815,7 +2930,7 @@ const MasterDB = {
               <button onclick="MasterDB.openRateHistoryModal('${it.slug}', ${it.id})" class="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Rates Log">
                 <i data-lucide="history" class="w-3.5 h-3.5"></i>
               </button>
-              <button onclick="MasterDB.closeRateListModal(); MasterDB.openForm(${it.id})" class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer" title="Edit Item">
+              <button onclick="MasterDB.closeRateListModal(); MasterDB.openForm(${it.id}, '${it.slug}')" class="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors cursor-pointer" title="Edit Item">
                 <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -2842,9 +2957,9 @@ const MasterDB = {
       <div class="receipt-80mm" style="width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; font-family: 'Courier New', Courier, monospace, system-ui; color: #000; font-size: 11px; line-height: 1.35; background: #fff; box-sizing: border-box;">
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 5px; border-bottom: 1.5px dashed #000; padding-bottom: 5px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">ISHAQ JADOON TRADERS</h1>
-          <p style="margin: 2px 0 0 0; font-size: 10px; font-weight: 700; line-height: 1.3;">Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt</p>
-          <p style="margin: 2px 0 0 0; font-size: 9.5px; font-weight: 700; line-height: 1.3;">M.Ishaq 0301-2630481 &bull; Ch. Shakir 0300-5074410</p>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">${this.settings?.company_name || 'NH DOORS'}</h1>
+          <p style="margin: 2px 0 0 0; font-size: 10px; font-weight: 700; line-height: 1.3;">${this.settings?.address || 'Taxila'}</p>
+          ${this.settings?.phone ? `<p style="margin: 2px 0 0 0; font-size: 9.5px; font-weight: 700; line-height: 1.3;">${this.settings.phone}</p>` : ''}
           <div style="margin-top: 4px; padding: 2px 0; background: #000; color: #fff; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
             OFFICIAL RATE LIST / COST MASTER
           </div>
@@ -2877,7 +2992,7 @@ const MasterDB = {
                   <td style="padding: 2.5px 2px; text-align: center; font-weight: 700; border-right: 1px solid #000; vertical-align: top;">${idx + 1}</td>
                   <td style="padding: 2.5px 4px; text-align: left; vertical-align: top; border-right: 1px solid #000;">
                     <div style="font-weight: 800; word-break: break-word; line-height: 1.2;">${it.item_name}</div>
-                    <div style="font-size: 7.5px; color: #444;">[${it.category_label}] • Stk: ${it.current_stock || 0}</div>
+                    <div style="font-size: 7.5px; color: #444;">[${it.category_label}] • Stk: ${app.formatQty(it.current_stock || 0)}</div>
                   </td>
                   <td style="padding: 2.5px 3px; text-align: right; vertical-align: top; font-weight: 600; border-right: 1px solid #000;">
                     ${Number(it.cost_price || 0).toLocaleString()}
@@ -2897,7 +3012,7 @@ const MasterDB = {
         <!-- Footer -->
         <div style="text-align: center; margin-top: 6px; border-top: 1px dashed #000; padding-top: 4px; font-size: 9px;">
           <p style="margin: 0; font-weight: 700; text-transform: uppercase;">*** END OF RATE LIST ***</p>
-          <p style="margin: 1px 0 0 0; color: #555; font-size: 8.5px;">Software by Ishaq Jadoon Traders</p>
+          <p style="margin: 1px 0 0 0; color: #555; font-size: 8.5px;">Software by ${this.settings?.company_name || 'NH Doors'}</p>
         </div>
       </div>
     `;
@@ -2921,3 +3036,5 @@ const MasterDB = {
     }
   }
 };
+
+window.MasterDB = MasterDB;

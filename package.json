@@ -1,7 +1,7 @@
 {
-  "name": "ishaq-jadoon-traders",
+  "name": "nh-doors",
   "version": "1.0.0",
-  "description": "Ishaq Jadoon Traders Management System",
+  "description": "NH Doors Management System",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -21,8 +21,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.ishaqjadoon.traders",
-    "productName": "Ishaq Jadoon Traders",
+    "appId": "com.nhdoors.app",
+    "productName": "NH Doors",
     "win": {
       "target": "nsis"
     },

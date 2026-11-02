@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-app.setName('ishaq-jadoon-traders');
+app.setName('nh-doors');
 const db = require('./database');
 
 let mainWindow;
@@ -182,7 +182,7 @@ function pruneOldBackups(dir, keepCount = 50) {
   try {
     if (!fs.existsSync(dir)) return;
     const files = fs.readdirSync(dir)
-      .filter(f => f.startsWith('IshaqJadoonTraders-AutoBackup-') && f.endsWith('.db'))
+      .filter(f => (f.startsWith('NHDoors-AutoBackup-') || f.startsWith('IshaqJadoonTraders-AutoBackup-')) && f.endsWith('.db'))
       .map(f => {
         const fullPath = path.join(dir, f);
         return { name: f, fullPath, mtime: fs.statSync(fullPath).mtimeMs };
@@ -203,7 +203,7 @@ async function performAutoBackup() {
   try {
     const settings = db.getSettings();
     let targetDir = settings.auto_backup_dir;
-    const defaultDir = path.join(app.getPath('documents'), 'Ishaq Jadoon Traders Backups');
+    const defaultDir = path.join(app.getPath('documents'), 'NH Doors Backups');
 
     if (!targetDir || !fs.existsSync(targetDir)) {
       try {
@@ -220,7 +220,7 @@ async function performAutoBackup() {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const datetimeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-    const fileName = `IshaqJadoonTraders-AutoBackup-${datetimeStr}.db`;
+    const fileName = `NHDoors-AutoBackup-${datetimeStr}.db`;
     const destPath = path.join(targetDir, fileName);
 
     console.log(`[AutoBackup] Backing up database to: ${destPath}`);
@@ -241,14 +241,14 @@ ipcMain.handle('get-backup-directory', () => {
   if (settings.auto_backup_dir && fs.existsSync(settings.auto_backup_dir)) {
     return settings.auto_backup_dir;
   }
-  return path.join(app.getPath('documents'), 'Ishaq Jadoon Traders Backups');
+  return path.join(app.getPath('documents'), 'NH Doors Backups');
 });
 
 ipcMain.handle('select-backup-directory', async () => {
   const settings = db.getSettings();
   const defaultDir = (settings.auto_backup_dir && fs.existsSync(settings.auto_backup_dir))
     ? settings.auto_backup_dir
-    : path.join(app.getPath('documents'), 'Ishaq Jadoon Traders Backups');
+    : path.join(app.getPath('documents'), 'NH Doors Backups');
   if (!fs.existsSync(defaultDir)) {
     try { fs.mkdirSync(defaultDir, { recursive: true }); } catch (e) {}
   }
@@ -271,7 +271,7 @@ ipcMain.handle('open-backup-directory', async () => {
   const settings = db.getSettings();
   let dir = settings.auto_backup_dir;
   if (!dir || !fs.existsSync(dir)) {
-    dir = path.join(app.getPath('documents'), 'Ishaq Jadoon Traders Backups');
+    dir = path.join(app.getPath('documents'), 'NH Doors Backups');
   }
   if (!fs.existsSync(dir)) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
@@ -289,7 +289,7 @@ ipcMain.handle('backup-data', async () => {
   
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Backup Database',
-    defaultPath: `IshaqJadoonTraders-${datetimeStr}.db`,
+    defaultPath: `NHDoors-${datetimeStr}.db`,
     filters: [{ name: 'SQLite Database', extensions: ['db'] }]
   });
 

@@ -45,9 +45,23 @@ window.SalesForm = {
     return catMap[slug] || (rawCat || (slug ? slug.toUpperCase() : ''));
   },
 
+  async loadCustomers() {
+    try {
+      this.customers = (await window.api.getCustomers()) || [];
+      const nameInput = document.getElementById('sf-customer-name');
+      if (nameInput && !nameInput.readOnly && nameInput.value.trim().length > 0 && document.activeElement === nameInput) {
+        this.handleCustomerInput(nameInput.value);
+      }
+    } catch (e) {
+      console.error('Failed to load customers in SalesForm:', e);
+      this.customers = this.customers || [];
+    }
+    return this.customers;
+  },
+
   async render(container, args) {
     this.settings = await window.api.getSettings();
-    this.customers = await window.api.getCustomers() || [];
+    await this.loadCustomers();
     this.categoryLabels = await window.api.getCategoryLabels() || [];
     this.paymentMethod = 'Cash';
     this.cart = [];
@@ -153,7 +167,7 @@ window.SalesForm = {
             <div class="flex items-center gap-2.5">
               <span class="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-sm"></span>
               <h2 class="text-xl font-black tracking-wide uppercase text-white flex items-center gap-2">
-                ${this.editingSaleId ? `<span class="text-blue-400">EDIT INVOICE</span> #${this.saleNumber}` : 'ISHAQ JADOON TRADERS'}
+                ${this.editingSaleId ? `<span class="text-blue-400">EDIT INVOICE</span> #${this.saleNumber}` : (this.settings?.company_name || 'NH DOORS')}
               </h2>
             </div>
             <div class="h-4 w-[1px] bg-slate-700"></div>
@@ -557,7 +571,8 @@ window.SalesForm = {
   },
 
   // --- Custom Customer Dropdown Methods ---
-  handleCustomerFocus() {
+  async handleCustomerFocus() {
+    this.loadCustomers();
     const input = document.getElementById('sf-customer-name');
     if (input && !input.readOnly) {
       const val = (input.value || '').trim();
@@ -580,7 +595,7 @@ window.SalesForm = {
     if (dropdown) dropdown.classList.add('hidden');
   },
 
-  handleCustomerInput(val) {
+  async handleCustomerInput(val) {
     const q = (val || '').trim().toLowerCase();
     const dropdown = document.getElementById('sf-customer-dropdown');
     const clearBtn = document.getElementById('sf-customer-clear-btn');
@@ -596,47 +611,50 @@ window.SalesForm = {
       this.customerSearchResults = [];
       dropdown.classList.add('hidden');
       return;
-    } else {
-      const all = this.customers || [];
-      let matches = all.filter(c => {
-        const name = (c.name || '').toLowerCase();
-        const phone = (c.phone || '').toLowerCase();
-        return name.includes(q) || phone.includes(q);
-      });
-
-      // Sort by relevance:
-      // 1. Customer Name starts directly with query (e.g. "S...")
-      // 2. Any individual word in customer name starts with query (e.g. "M. SALMAN", "ADNAN SWEETS")
-      // 3. Customer Phone starts with query
-      // 4. Customer Phone includes query
-      // 5. Customer Name contains query elsewhere
-      matches.sort((a, b) => {
-        const nameA = (a.name || '').toLowerCase();
-        const nameB = (b.name || '').toLowerCase();
-        const phoneA = (a.phone || '').toLowerCase();
-        const phoneB = (b.phone || '').toLowerCase();
-
-        const getScore = (name, phone) => {
-          if (name.startsWith(q)) return 1;
-          const words = name.split(/[\s\-&/]+/);
-          if (words.some(w => w.startsWith(q))) return 2;
-          if (phone.startsWith(q)) return 3;
-          if (phone.includes(q)) return 4;
-          return 5;
-        };
-
-        const scoreA = getScore(nameA, phoneA);
-        const scoreB = getScore(nameB, phoneB);
-
-        if (scoreA !== scoreB) {
-          return scoreA - scoreB;
-        }
-
-        return nameA.localeCompare(nameB);
-      });
-
-      this.customerSearchResults = matches.slice(0, 15);
     }
+
+    if (!this.customers || this.customers.length === 0) {
+      await this.loadCustomers();
+    }
+    const all = this.customers || [];
+    let matches = all.filter(c => {
+      const name = (c.name || '').toLowerCase();
+      const phone = (c.phone || '').toLowerCase();
+      return name.includes(q) || phone.includes(q);
+    });
+
+    // Sort by relevance:
+    // 1. Customer Name starts directly with query (e.g. "S...")
+    // 2. Any individual word in customer name starts with query (e.g. "M. SALMAN", "ADNAN SWEETS")
+    // 3. Customer Phone starts with query
+    // 4. Customer Phone includes query
+    // 5. Customer Name contains query elsewhere
+    matches.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      const phoneA = (a.phone || '').toLowerCase();
+      const phoneB = (b.phone || '').toLowerCase();
+
+      const getScore = (name, phone) => {
+        if (name.startsWith(q)) return 1;
+        const words = name.split(/[\s\-&/]+/);
+        if (words.some(w => w.startsWith(q))) return 2;
+        if (phone.startsWith(q)) return 3;
+        if (phone.includes(q)) return 4;
+        return 5;
+      };
+
+      const scoreA = getScore(nameA, phoneA);
+      const scoreB = getScore(nameB, phoneB);
+
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
+      }
+
+      return nameA.localeCompare(nameB);
+    });
+
+    this.customerSearchResults = matches.slice(0, 15);
 
     this.highlightedCustomerIndex = 0;
     this.renderCustomerDropdown();
@@ -938,7 +956,7 @@ window.SalesForm = {
       const origQty = this.originalItemsMap[`${itemSlug}-${itemId}`] || 0;
       stock += origQty;
     }
-    return Math.max(0, stock);
+    return Math.round(Math.max(0, stock) * 100) / 100;
   },
 
   getItemLatestCost(item) {
@@ -1139,7 +1157,7 @@ window.SalesForm = {
           <!-- Single Line: Stock, Cost Price (C: Rs. XX), Latest Cost (L.Cost: Rs. XX), Sale Price -->
           <div class="flex items-center gap-3.5 shrink-0 text-right">
             <span class="text-[13px] font-black ${stock > 0 ? (isHighlighted ? 'text-amber-100' : 'text-emerald-700') : (isHighlighted ? 'text-rose-200' : 'text-rose-600')} tabular-nums">
-              ${stock} ${item.unit || 'pcs'} avail
+              ${app.formatQty(stock)} ${item.unit || 'pcs'} avail
             </span>
             <span class="text-[13px] font-bold ${isHighlighted ? 'text-amber-100/90' : 'text-slate-500'} font-display tabular-nums">
               (C: Rs. ${app.formatAmount(cost)}) (L.Cost: Rs. ${app.formatAmount(latestCost)})
@@ -1377,6 +1395,7 @@ window.SalesForm = {
 
     let parsed = parseFloat(qty);
     if (isNaN(parsed)) parsed = 0;
+    parsed = Math.round(parsed * 100) / 100;
 
     if (parsed > maxStock) {
       parsed = maxStock;
@@ -1403,6 +1422,9 @@ window.SalesForm = {
     } else if (parsed > maxStock) {
       parsed = maxStock;
       inputEl.value = maxStock;
+    } else {
+      parsed = Math.round(parsed * 100) / 100;
+      inputEl.value = parsed;
     }
 
     item.qty = parsed;
@@ -1539,7 +1561,7 @@ window.SalesForm = {
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-black text-slate-900 text-xs truncate max-w-[280px]">${item.item_name}</span>
               ${categoryLabel ? `<span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight font-sans">(${categoryLabel})</span>` : ''}
-              <span class="text-[9px] font-bold ${maxStock > 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200/60' : 'text-rose-600 bg-rose-50 border-rose-200/60'} px-1.5 py-0.2 rounded border tabular-nums ml-auto sm:ml-0">${maxStock} in stock</span>
+              <span class="text-[9px] font-bold ${maxStock > 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200/60' : 'text-rose-600 bg-rose-50 border-rose-200/60'} px-1.5 py-0.2 rounded border tabular-nums ml-auto sm:ml-0">${app.formatQty(maxStock)} in stock</span>
             </div>
           </td>
 
@@ -1548,7 +1570,7 @@ window.SalesForm = {
             <div class="inline-flex items-center justify-center gap-1">
               <input type="number" 
                      id="cart-qty-input-${idx}"
-                     value="${item.qty}"
+                     value="${app.formatQty(item.qty)}"
                      min="1"
                      max="${maxStock}"
                      step="any"
@@ -2055,6 +2077,7 @@ window.SalesForm = {
                 amount: dueAmount,
                 description: 'Created during invoice #' + currentSaleNo
               });
+              await this.loadCustomers();
             } catch(e) {
               console.error("Failed to auto-create customer:", e);
             }
@@ -2177,7 +2200,7 @@ window.SalesForm = {
         </div>` : ''}
         <div class="flex justify-between items-center text-slate-500">
           <span>Total Items</span>
-          <span class="font-bold text-slate-800">${items.length} item${items.length === 1 ? '' : 's'} (${items.reduce((s, i) => s + i.qty, 0)} qty)</span>
+          <span class="font-bold text-slate-800">${items.length} item${items.length === 1 ? '' : 's'} (${app.formatQty(items.reduce((s, i) => s + (Number(i.qty) || 0), 0))} qty)</span>
         </div>
         ${totalDiscount > 0 ? `
         <div class="flex justify-between items-center text-slate-500">
@@ -2245,6 +2268,12 @@ window.SalesForm = {
     const items = data.items || [];
     const totalQty = items.reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
 
+    if ((!this.availableItems || this.availableItems.length === 0) && window.api && typeof window.api.searchAllProducts === 'function') {
+      try {
+        this.availableItems = await window.api.searchAllProducts('');
+      } catch (e) {}
+    }
+
     let rowsHtml = '';
     let itemsGrossSubtotal = 0;
     if (items.length === 0) {
@@ -2265,13 +2294,29 @@ window.SalesForm = {
         
         itemsGrossSubtotal += lineTotal;
         const isLast = i === items.length - 1;
+
+        let unitStr = (item.unit || item.unit_name || '').trim();
+        if (!unitStr && this.availableItems && this.availableItems.length > 0) {
+          const match = this.availableItems.find(p => (item.item_id && p.id === item.item_id) || (item.id && p.id === item.id) || (p.item_name && item.description && item.description.toUpperCase().startsWith(p.item_name.toUpperCase())));
+          if (match && match.unit) {
+            unitStr = match.unit.trim();
+          }
+        }
+        if (!unitStr) {
+          unitStr = 'PC';
+        }
+        let unitDisplay = unitStr.toUpperCase();
+        if (unitDisplay === 'PCS' && Math.abs(Number(item.qty)) === 1) {
+          unitDisplay = 'PC';
+        }
+
         rowsHtml += `
           <tr style="border-bottom: ${isLast ? 'none' : '1px solid #000'}; font-size: 9.5px;">
             <td style="padding: 2.5px 2px; text-align: center; font-weight: 700; border-right: 1px solid #000;">${i + 1}</td>
             <td style="padding: 2.5px 4px; text-align: left; font-weight: 800; word-break: break-word; line-height: 1.2; border-right: 1px solid #000;">
               <div>${desc}</div>
             </td>
-            <td style="padding: 2.5px 2px; text-align: center; font-weight: 800; white-space: nowrap; border-right: 1px solid #000;">${item.qty}</td>
+            <td style="padding: 2.5px 2px; text-align: center; font-weight: 800; white-space: nowrap; border-right: 1px solid #000;">${app.formatQty(item.qty)} ${unitDisplay}</td>
             <td style="padding: 2.5px 3px; text-align: right; font-weight: 600; white-space: nowrap; border-right: 1px solid #000;">${app.formatAmount(rate)}</td>
             <td style="padding: 2.5px 4px; text-align: right; font-weight: 800; white-space: nowrap;">${app.formatAmount(lineTotal)}</td>
           </tr>
@@ -2307,12 +2352,9 @@ window.SalesForm = {
         
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 4px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt'}</div>
-          <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-            <div>M.Ishaq: 0301-2630481</div>
-            <div>Ch. Shakir: 0300-5074410</div>
-          </div>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${this.settings.company_name || 'NH DOORS'}</h1>
+          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${this.settings.address || 'Taxila'}</div>
+          ${this.settings.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${this.settings.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
           <div style="margin-top: 5px;">
             <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 12px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">SALES INVOICE</span>
           </div>
@@ -2338,9 +2380,9 @@ window.SalesForm = {
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 9.5px; border: 1.5px solid #000;">
           <thead>
             <tr style="border-bottom: 1.5px solid #000; font-size: 9px; font-weight: 900; text-transform: uppercase;">
-              <th style="padding: 3px 2px; text-align: center; width: 7%; border-right: 1px solid #000;">#</th>
-              <th style="padding: 3px 4px; text-align: left; width: 45%; border-right: 1px solid #000;">ITEM</th>
-              <th style="padding: 3px 2px; text-align: center; width: 16%; border-right: 1px solid #000;">QTY</th>
+              <th style="padding: 3px 2px; text-align: center; width: 6%; border-right: 1px solid #000;">#</th>
+              <th style="padding: 3px 4px; text-align: left; width: 42%; border-right: 1px solid #000;">ITEM</th>
+              <th style="padding: 3px 2px; text-align: center; width: 20%; border-right: 1px solid #000;">QTY</th>
               <th style="padding: 3px 3px; text-align: right; width: 16%; border-right: 1px solid #000;">RATE</th>
               <th style="padding: 3px 4px; text-align: right; width: 16%;">TOTAL</th>
             </tr>
@@ -2380,7 +2422,7 @@ window.SalesForm = {
             <span>Rs. ${app.formatAmount(remainingDue)}</span>
           </div>` : ''}
           <div style="display: flex; justify-content: space-between; margin-top: 3px; font-size: 10px; font-weight: 600;">
-            <span>Total Items: ${items.length} (Qty: ${totalQty})</span>
+            <span>Total Items: ${items.length} (Qty: ${app.formatQty(totalQty)})</span>
             <span>Status: <b>${remainingDue > 0 ? (receivedAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID'}</b></span>
           </div>
         </div>
@@ -2475,15 +2517,17 @@ window.SalesForm = {
     if (recInput) recInput.value = '';
     this.renderCart();
     this.updateSummary();
+    await this.loadCustomers();
     app.showToast('Bill cleared', 'info');
   },
 
   async refreshStockIndicators() {
     try {
       this.availableItems = await window.api.searchAllProducts('');
+      await this.loadCustomers();
       this.renderCart();
     } catch (e) {
-      console.error('Failed to refresh stock indicators:', e);
+      console.error('Failed to refresh stock indicators / customers:', e);
     }
   }
 };

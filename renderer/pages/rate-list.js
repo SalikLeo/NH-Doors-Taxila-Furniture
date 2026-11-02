@@ -213,7 +213,7 @@ const RateList = {
           </td>
           <td class="py-2.5 px-2 text-right border-r border-slate-200">
             <span class="px-2 py-0.5 rounded-full font-black text-[11px] ${isLowStock ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-slate-100 text-slate-700'}">
-              ${item.current_stock}
+              ${app.formatQty(item.current_stock)}
             </span>
           </td>
           <td class="py-2.5 px-2 text-right font-bold text-slate-600 border-r border-slate-200">
@@ -608,12 +608,9 @@ const RateList = {
     const html = `
       <div class="receipt-80mm" style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; color: #000; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
         <div style="text-align: center; margin-bottom: 4px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${s.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt</div>
-          <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-            <div>M.Ishaq: 0301-2630481</div>
-            <div>Ch. Shakir: 0300-5074410</div>
-          </div>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${s.company_name || 'NH DOORS'}</h1>
+          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${s.address || 'Taxila'}</div>
+          ${s.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${s.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
           <div style="margin-top: 5px;">
             <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">ITEM RATE & COST LOG</span>
           </div>
@@ -655,7 +652,7 @@ const RateList = {
         </table>
 
         <div style="text-align: center; font-size: 9px; margin-top: 6px; border-top: 1px dashed #000; padding-top: 4px;">
-          <p style="margin: 0; font-weight: 700; text-transform: uppercase;">*** Ishaq Jadoon Traders - Internal Record ***</p>
+          <p style="margin: 0; font-weight: 700; text-transform: uppercase;">*** NH Doors - Internal Record ***</p>
         </div>
       </div>
     `;
@@ -678,7 +675,7 @@ const RateList = {
           <div>${i.item_name}</div>
           <div style="font-size: 7.5px; font-weight: normal; color: #333;">${i.category_label || ''}</div>
         </td>
-        <td style="padding: 2.5px 2px; text-align: center; font-weight: 800; border-right: 1px solid #000;">${i.current_stock || 0}</td>
+        <td style="padding: 2.5px 2px; text-align: center; font-weight: 800; border-right: 1px solid #000;">${app.formatQty(i.current_stock || 0)}</td>
         <td style="padding: 2.5px 3px; text-align: right; font-weight: 600; border-right: 1px solid #000;">${Number(i.cost_price || 0).toLocaleString()}</td>
         <td style="padding: 2.5px 4px; text-align: right; font-weight: 800;">${Number(i.retail_price || 0).toLocaleString()}</td>
       </tr>
@@ -687,12 +684,9 @@ const RateList = {
     const html = `
       <div class="receipt-80mm" style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px 6px; color: #000; font-size: 11px; line-height: 1.35; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;">
         <div style="text-align: center; margin-bottom: 4px;">
-          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${s.company_name || 'ISHAQ JADOON TRADERS'}</h1>
-          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">Near CB Plaza, Barrier 3, Main GT Road, Wah Cantt</div>
-          <div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">
-            <div>M.Ishaq: 0301-2630481</div>
-            <div>Ch. Shakir: 0300-5074410</div>
-          </div>
+          <h1 style="font-size: 16px; font-weight: 900; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.5px; color: #000; line-height: 1.2;">${s.company_name || 'NH DOORS'}</h1>
+          <div style="font-size: 11px; font-weight: 600; color: #000; line-height: 1.25; margin-bottom: 2px;">${s.address || 'Taxila'}</div>
+          ${s.phone ? `<div style="font-size: 11px; font-weight: 700; color: #000; line-height: 1.3;">${s.phone.split(',').map(p => `<div>${p.trim()}</div>`).join('')}</div>` : ''}
           <div style="margin-top: 5px;">
             <span style="display: inline-block; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px;">MASTER RATE LIST</span>
           </div>
@@ -716,7 +710,7 @@ const RateList = {
         </table>
 
         <div style="text-align: center; font-size: 9px; margin-top: 6px; border-top: 1px dashed #000; padding-top: 4px;">
-          <p style="margin: 0; font-weight: 700; text-transform: uppercase;">*** Ishaq Jadoon Traders ***</p>
+          <p style="margin: 0; font-weight: 700; text-transform: uppercase;">*** NH Doors ***</p>
         </div>
       </div>
     `;

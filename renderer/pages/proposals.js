@@ -2,6 +2,9 @@ window.Proposals = {
   sales: [],
   selectedMethods: ['Cash', 'Online'],
   currentPeriodType: 'day',
+  currentPage: 1,
+  pageSize: 50,
+  currentFilteredSales: [],
 
   async render(container) {
     const savedShowStats = window.storage.get('sales_show_stats');
@@ -187,6 +190,7 @@ window.Proposals = {
             <tbody id="sales-list-body" class="divide-y divide-slate-200 bg-white"></tbody>
           </table>
         </div>
+        <div id="sales-pagination-footer" class="shrink-0"></div>
       </div>
     `;
 
@@ -360,9 +364,16 @@ window.Proposals = {
       });
     }
 
+    this.currentPage = 1;
+    this.currentFilteredSales = filtered;
     this.updateStats(filtered);
     this.renderList(filtered);
     this.updateClearPeriodButton();
+  },
+
+  changePage(page) {
+    this.currentPage = page;
+    this.renderList(this.currentFilteredSales || []);
   },
 
   updateClearPeriodButton() {
@@ -408,15 +419,29 @@ window.Proposals = {
   },
 
   renderList(list) {
+    this.currentFilteredSales = list || [];
     const tbody = document.getElementById('sales-list-body');
+    const footer = document.getElementById('sales-pagination-footer');
     if (!tbody) return;
 
-    if (list.length === 0) {
+    if (!list || list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-12 text-center text-slate-400 font-medium">No sales found for this period.</td></tr>`;
+        if (footer) footer.innerHTML = '';
+        if (window.lucide) lucide.createIcons();
         return;
     }
 
-    tbody.innerHTML = list.map((s, idx) => {
+    const total = list.length;
+    const totalPages = Math.ceil(total / this.pageSize);
+    if (this.currentPage > totalPages) this.currentPage = totalPages;
+    if (this.currentPage < 1) this.currentPage = 1;
+
+    const startIdx = (this.currentPage - 1) * this.pageSize;
+    const endIdx = Math.min(startIdx + this.pageSize, total);
+    const paginated = list.slice(startIdx, endIdx);
+
+    tbody.innerHTML = paginated.map((s, idx) => {
+        const rowNum = startIdx + idx + 1;
         const method = s.payment_method || 'Cash';
         const isOnline = method.toLowerCase() === 'online';
         const profit = s.profit !== undefined ? s.profit : ((s.retail_total || 0) - (s.cost_total || 0));
@@ -426,7 +451,7 @@ window.Proposals = {
         
         return `
         <tr class="hover:bg-slate-50 transition-colors group border-b border-slate-200">
-            <td class="px-2 py-1 text-center font-bold text-slate-400 tabular-nums border-r border-slate-200 text-xs">${idx + 1}</td>
+            <td class="px-2 py-1 text-center font-bold text-slate-400 tabular-nums border-r border-slate-200 text-xs">${rowNum}</td>
             <td class="px-4 py-1 border-r border-slate-200">
                 <div class="font-bold text-slate-800 uppercase tracking-tight text-xs">${s.proposal_number}</div>
             </td>
@@ -466,6 +491,38 @@ window.Proposals = {
             </td>
         </tr>
     `;}).join('');
+
+    if (footer) {
+      if (total <= this.pageSize) {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs font-bold text-slate-500">
+            <span>Showing all <span class="font-black text-slate-800">${total}</span> invoice${total === 1 ? '' : 's'}</span>
+          </div>
+        `;
+      } else {
+        footer.innerHTML = `
+          <div class="flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs font-bold text-slate-600 flex-wrap gap-2 select-none">
+            <div>
+              Showing <span class="font-black text-slate-900">${startIdx + 1}</span> - <span class="font-black text-slate-900">${endIdx}</span> of <span class="font-black text-slate-900">${total}</span> invoices
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" ${this.currentPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Proposals.changePage(' + (this.currentPage - 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                <span>Prev</span>
+              </button>
+              <span class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-800 font-black">
+                Page ${this.currentPage} of ${totalPages}
+              </span>
+              <button type="button" ${this.currentPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : 'onclick="Proposals.changePage(' + (this.currentPage + 1) + ')" class="cursor-pointer hover:bg-slate-200 active:scale-95"'} class="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-bold transition-all flex items-center gap-1">
+                <span>Next</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
     if (window.lucide) lucide.createIcons();
   },
 
@@ -769,6 +826,9 @@ window.Proposals = {
                     sale.received_amount = result.newReceived;
                     sale.status = result.status;
                     this.applyFilters();
+                    if (window.SalesForm && typeof SalesForm.loadCustomers === 'function') {
+                        SalesForm.loadCustomers();
+                    }
                 }
                 app.hideLoading();
             } catch (e) {
