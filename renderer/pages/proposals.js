@@ -483,9 +483,9 @@ window.Proposals = {
             </td>
             <td class="px-4 py-1 text-right font-medium">
                 <div class="flex items-center justify-end gap-1.5 transition-opacity">
-                    <button onclick="Proposals.viewReceipt(${s.id})" class="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-all cursor-pointer" title="View Receipt"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                    <button onclick="Proposals.viewOrderDetails(${s.id})" class="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer" title="View Order & Materials Used"><i data-lucide="layers" class="w-4 h-4"></i></button>
+                    <button onclick="Proposals.viewReceipt(${s.id})" class="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-all cursor-pointer" title="Print Customer Receipt"><i data-lucide="printer" class="w-4 h-4"></i></button>
                     <button onclick="Proposals.editSale(${s.id})" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer" title="Return or Edit Sale"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                    <button onclick="Proposals.directPrint(${s.id})" class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer" title="Direct Print"><i data-lucide="printer" class="w-4 h-4"></i></button>
                     <button onclick="Proposals.deleteSale(${s.id})" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="Delete Sale"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                 </div>
             </td>
@@ -628,6 +628,173 @@ window.Proposals = {
         this.renderMethodOptions();
         const close = () => { menu.classList.add('hidden'); document.removeEventListener('click', close); };
         setTimeout(() => document.addEventListener('click', close), 10);
+    }
+  },
+
+  async viewOrderDetails(id) {
+    app.showLoading();
+    try {
+      const sale = await window.api.getProposal(id);
+      if (!sale) throw new Error("Order not found");
+      
+      const items = sale.items || [];
+      const billedItems = items.filter(it => it.item_type === 'billed' || (!it.item_type && !it.item_id));
+      const materialItems = items.filter(it => it.item_type === 'material' || (!it.item_type && it.item_id));
+
+      const totalBilled = Number(sale.retail_total) || 0;
+      const totalCost = Number(sale.cost_total) || materialItems.reduce((sum, m) => sum + (Number(m.line_cost) || 0), 0);
+      const profit = totalBilled - totalCost;
+      const received = Number(sale.received_amount !== undefined ? sale.received_amount : totalBilled);
+      const due = Math.max(0, totalBilled - received);
+
+      let modal = document.getElementById('order-details-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'order-details-modal';
+        modal.className = 'fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-[1000] p-4 no-print';
+        document.body.appendChild(modal);
+      }
+
+      modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+          
+          <!-- Modal Header -->
+          <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+              <div>
+                <h3 class="text-base font-black uppercase tracking-wide">Order #${sale.proposal_number}</h3>
+                <div class="text-xs text-slate-400 font-medium">Customer: <span class="text-white font-bold">${sale.customer_name || 'Walk-in Customer'}</span> ${sale.phone ? `• ${sale.phone}` : ''}</div>
+              </div>
+            </div>
+            <button onclick="document.getElementById('order-details-modal').classList.add('hidden')" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="p-6 overflow-y-auto space-y-6">
+            
+            <!-- Section 1: Customer Billed Items -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <i data-lucide="receipt" class="w-4 h-4 text-emerald-600"></i>
+                  Customer Bill (Shows on Receipt)
+                </h4>
+                <span class="text-xs font-black text-emerald-700">Total: Rs. ${totalBilled.toLocaleString()}</span>
+              </div>
+              <div class="border border-slate-200 rounded-xl overflow-hidden">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-black uppercase text-[10px]">
+                    <tr>
+                      <th class="py-2 px-3 w-8 text-center">#</th>
+                      <th class="py-2 px-3">Item Description</th>
+                      <th class="py-2 px-3 text-center w-16">Qty</th>
+                      <th class="py-2 px-3 text-right w-28">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${billedItems.length > 0 ? billedItems.map((it, idx) => `
+                      <tr>
+                        <td class="py-2 px-3 text-center text-slate-400 font-bold">${idx + 1}</td>
+                        <td class="py-2 px-3 font-bold text-slate-800">${it.description}</td>
+                        <td class="py-2 px-3 text-center font-bold text-slate-700">${it.qty || 1}</td>
+                        <td class="py-2 px-3 text-right font-black text-slate-900 font-mono">Rs. ${Number(it.line_retail || it.unit_retail || 0).toLocaleString()}</td>
+                      </tr>
+                    `).join('') : `
+                      <tr><td colspan="4" class="py-3 text-center text-slate-400">No billed items</td></tr>
+                    `}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Section 2: Used Materials From Stock (The Workshop Secret Recipe) -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <i data-lucide="box" class="w-4 h-4 text-amber-600"></i>
+                  Materials Used from Stock (Workshop Only - Hidden from Customer)
+                </h4>
+                <span class="text-xs font-black text-amber-700">Material Cost: Rs. ${totalCost.toLocaleString()}</span>
+              </div>
+              <div class="border border-slate-200 rounded-xl overflow-hidden">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-black uppercase text-[10px]">
+                    <tr>
+                      <th class="py-2 px-3 w-8 text-center">#</th>
+                      <th class="py-2 px-3">Stock Material</th>
+                      <th class="py-2 px-3 text-center w-24">Qty Deducted</th>
+                      <th class="py-2 px-3 text-right w-24">Unit Cost</th>
+                      <th class="py-2 px-3 text-right w-28">Total Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${materialItems.length > 0 ? materialItems.map((m, idx) => `
+                      <tr>
+                        <td class="py-2 px-3 text-center text-slate-400 font-bold">${idx + 1}</td>
+                        <td class="py-2 px-3 font-bold text-slate-800">${m.description}</td>
+                        <td class="py-2 px-3 text-center font-black text-amber-700 bg-amber-50/50">${m.qty} ${m.unit || 'pcs'}</td>
+                        <td class="py-2 px-3 text-right text-slate-500 font-mono">Rs. ${Number(m.unit_cost || 0).toLocaleString()}</td>
+                        <td class="py-2 px-3 text-right font-black text-slate-900 font-mono">Rs. ${Number(m.line_cost || 0).toLocaleString()}</td>
+                      </tr>
+                    `).join('') : `
+                      <tr><td colspan="5" class="py-4 text-center text-slate-400">No raw stock materials were recorded for this order.</td></tr>
+                    `}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Financial Summary Cards -->
+            <div class="grid grid-cols-3 gap-3">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                <div class="text-[10px] font-black uppercase text-slate-400">Customer Bill</div>
+                <div class="text-sm font-black text-slate-800 font-mono mt-0.5">Rs. ${totalBilled.toLocaleString()}</div>
+              </div>
+              <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                <div class="text-[10px] font-black uppercase text-amber-600">Material Cost</div>
+                <div class="text-sm font-black text-amber-900 font-mono mt-0.5">Rs. ${totalCost.toLocaleString()}</div>
+              </div>
+              <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                <div class="text-[10px] font-black uppercase text-emerald-600">Net Profit</div>
+                <div class="text-sm font-black text-emerald-700 font-mono mt-0.5">Rs. ${profit.toLocaleString()}</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="bg-slate-50 border-t border-slate-200 px-6 py-3 flex items-center justify-between">
+            <div class="text-xs text-slate-500 font-medium">
+              Payment: <b class="text-slate-800">${(sale.payment_method || 'Cash').toUpperCase()}</b> 
+              ${due > 0 ? `• <span class="text-rose-600 font-bold">Khata Due: Rs. ${due.toLocaleString()}</span>` : '• <span class="text-emerald-600 font-bold">Fully Paid</span>'}
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="document.getElementById('order-details-modal').classList.add('hidden')" class="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-100">
+                Close
+              </button>
+              <button onclick="document.getElementById('order-details-modal').classList.add('hidden'); Proposals.viewReceipt(${sale.id});" class="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 shadow">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print Customer Receipt
+              </button>
+            </div>
+          </div>
+
+        </div>
+      `;
+
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+      };
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (window.lucide) lucide.createIcons();
+      app.hideLoading();
+    } catch (e) {
+      console.error(e);
+      app.hideLoading();
+      app.showAlert("Error loading order details: " + e.message);
     }
   },
 

@@ -14,14 +14,14 @@ app.whenReady().then(() => {
 
   // 1. Categories
   const categories = [
-    ['panels', 'Biscuits'],
-    ['inverters', 'Cold Drinks'],
-    ['structures', 'Jellies & Candies'],
-    ['cables', 'Snacks & Chips'],
-    ['breakers', 'Chocolates'],
-    ['batteries', 'Dairy & Groceries'],
-    ['misc', 'Juices & Beverages'],
-    ['others', 'General Items']
+    ['panels', 'Panels & Sheets'],
+    ['inverters', 'Lar & Timber'],
+    ['structures', 'Glue & Adhesives'],
+    ['cables', 'Hardware & Locks'],
+    ['breakers', 'Polish & Paints'],
+    ['batteries', 'Glass & Mirrors'],
+    ['misc', 'Laminates & Veneer'],
+    ['others', 'General Materials']
   ];
 
   db.exec(`CREATE TABLE IF NOT EXISTS category_labels (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE, label TEXT)`);

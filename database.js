@@ -294,6 +294,7 @@ function createTables() {
   try { db.exec('ALTER TABLE proposal_items ADD COLUMN item_id INTEGER'); } catch(e) {}
   try { db.exec('ALTER TABLE proposal_items ADD COLUMN unit_discounted REAL'); } catch(e) {}
   try { db.exec('ALTER TABLE proposal_items ADD COLUMN unit TEXT'); } catch(e) {}
+  try { db.exec("ALTER TABLE proposal_items ADD COLUMN item_type TEXT DEFAULT 'billed'"); } catch(e) {}
 
   // Expenses
   db.exec(`CREATE TABLE IF NOT EXISTS expense_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)`);
@@ -443,31 +444,36 @@ function seedInitialData() {
     const expenseStmt = db.prepare('INSERT OR IGNORE INTO expense_categories (name) VALUES (?)');
     cats.forEach(c => expenseStmt.run(c));
 
-    // Update / Ensure FMCG Product category labels
+    // Update / Ensure Furniture & Doors workshop category labels
     const productLabels = [
-      { slug: 'panels', label: 'Biscuits' },
-      { slug: 'inverters', label: 'Cold Drinks' },
-      { slug: 'structures', label: 'Jellies & Candies' },
-      { slug: 'cables', label: 'Snacks & Chips' },
-      { slug: 'breakers', label: 'Chocolates' },
-      { slug: 'batteries', label: 'Dairy & Groceries' },
-      { slug: 'misc', label: 'Juices & Beverages' },
-      { slug: 'others', label: 'General Items' }
+      { slug: 'panels', label: 'Panels & Sheets' },
+      { slug: 'inverters', label: 'Lar & Timber' },
+      { slug: 'structures', label: 'Glue & Adhesives' },
+      { slug: 'cables', label: 'Hardware & Locks' },
+      { slug: 'breakers', label: 'Polish & Paints' },
+      { slug: 'batteries', label: 'Glass & Mirrors' },
+      { slug: 'misc', label: 'Laminates & Veneer' },
+      { slug: 'others', label: 'General Materials' }
     ];
     
-    // Always upsert the 8 standard categories
+    // Always upsert standard categories
+    const oldFmcgOrSolarLabels = [
+      'Biscuits', 'Cold Drinks', 'Jellies & Candies', 'Snacks & Chips', 'Chocolates', 
+      'Dairy & Groceries', 'Juices & Beverages', 'General Items', 
+      'Panels', 'Solar Panels', 'Inverters', 'Structures', 'Cables', 'Breakers', 'Batteries', 'Accessories'
+    ];
     productLabels.forEach(l => {
       const existing = db.prepare('SELECT id, label FROM category_labels WHERE slug = ?').get(l.slug);
       if (!existing) {
         db.prepare('INSERT INTO category_labels (slug, label) VALUES (?, ?)').run(l.slug, l.label);
-      } else if (existing.label === 'Panels' || existing.label === 'Solar Panels' || existing.label === 'Inverters' || existing.label === 'Structures' || existing.label === 'Cables' || existing.label === 'Breakers' || existing.label === 'Batteries' || existing.label === 'Accessories') {
+      } else if (oldFmcgOrSolarLabels.includes(existing.label)) {
         db.prepare('UPDATE category_labels SET label = ? WHERE slug = ?').run(l.label, l.slug);
       }
     });
 
     // Default units
-    db.exec(`DELETE FROM product_units WHERE name IN ('FEET', 'RUNNING FEET', 'METER', 'COTTON')`);
-    const productUnits = ['PACK', 'PCS', 'BOX', 'BOTTLE', 'CARTON', 'SET'];
+    db.exec(`DELETE FROM product_units WHERE name IN ('BOTTLE', 'RUNNING FEET', 'METER', 'COTTON')`);
+    const productUnits = ['PCS', 'KG', 'FEET', 'SHEET', 'CAN', 'PACK', 'SET', 'BOX'];
     const unitStmt = db.prepare('INSERT OR IGNORE INTO product_units (name) VALUES (?)');
     productUnits.forEach(u => unitStmt.run(u));
   } catch (e) {
@@ -1065,13 +1071,28 @@ function saveProposal(data) {
     }
 
     if (items && items.length > 0) {
-      const stmt = db.prepare(`INSERT INTO proposal_items (proposal_id, item_id, section, description, qty, unit, unit_cost, unit_retail, unit_discounted, line_cost, line_retail, line_profit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const stmt = db.prepare(`INSERT INTO proposal_items (proposal_id, item_id, section, description, qty, unit, unit_cost, unit_retail, unit_discounted, line_cost, line_retail, line_profit, item_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
       for (const item of items) {
-        const discPrice = (item.unit_discounted !== undefined && item.unit_discounted !== null) ? item.unit_discounted : item.unit_retail;
-        stmt.run(proposalId, item.item_id, item.section, item.description, item.qty, item.unit, item.unit_cost, item.unit_retail, discPrice, item.line_cost, item.line_retail, item.line_profit);
+        const itemType = item.item_type || (item.item_id && item.section ? 'material' : 'billed');
+        const discPrice = (item.unit_discounted !== undefined && item.unit_discounted !== null) ? item.unit_discounted : (item.unit_retail || 0);
+        stmt.run(
+          proposalId, 
+          item.item_id || null, 
+          item.section || null, 
+          item.description || item.item_name || '', 
+          item.qty || 1, 
+          item.unit || 'pcs', 
+          item.unit_cost || 0, 
+          item.unit_retail || 0, 
+          discPrice, 
+          item.line_cost || 0, 
+          item.line_retail || 0, 
+          item.line_profit || 0,
+          itemType
+        );
         
-        // Deduct stock for all completed/saved sales (both new and edited)
+        // Deduct stock for all items that represent stock materials
         if (item.item_id && item.section) {
             const table = getProductTable(item.section);
             if (table) {
