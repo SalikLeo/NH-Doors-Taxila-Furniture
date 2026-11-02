@@ -976,7 +976,7 @@ const MasterDB = {
           <td class="px-3 py-1 tabular-nums text-xs text-right bg-purple-50/30 text-purple-900 border-r border-slate-200 font-black">${app.formatNumber(Math.round(itemValue))}</td>
           <td class="px-3 py-1 text-right font-medium">
             <div class="flex items-center justify-end gap-1.5 transition-opacity">
-              <button onclick="app.navigate('rate-list', { slug: '${itemSlug}', id: ${p.id} })" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer" title="Rate Changes Log &amp; Cost History">
+              <button onclick="MasterDB.openRateHistoryModal('${itemSlug}', ${p.id})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer" title="Rate Changes Log &amp; Cost History">
                 ${svgHistory}
               </button>
               <button onclick="MasterDB.toggleFavorite('${itemSlug}', ${p.id})" class="group/fav p-1.5 ${p.is_favorite ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'} rounded-lg transition-all flex items-center justify-center cursor-pointer" title="Toggle Favorite">

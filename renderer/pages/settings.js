@@ -3,7 +3,6 @@ const LOCKABLE_TABS = [
   { key: 'proposals', name: 'Sales History' },
   { key: 'customers', name: 'Customers' },
   { key: 'master-db', name: 'Stock' },
-  { key: 'rate-list', name: 'Rate List' },
   { key: 'expenses', name: 'Expenses' },
   { key: 'reports', name: 'Reports' },
   { key: 'companies', name: 'Purchases' },

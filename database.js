@@ -1737,14 +1737,8 @@ function addProductStock(data) {
   const inQty = Number(addedQty) || 0;
   const inPrice = Number(purchasePrice) || 0;
 
-  let newCost = inPrice;
-  if (oldStock > 0 && oldCost > 0 && inQty > 0) {
-    const totalOldVal = oldStock * oldCost;
-    const totalInVal = inQty * inPrice;
-    const totalQty = oldStock + inQty;
-    newCost = totalQty > 0 ? (totalOldVal + totalInVal) / totalQty : inPrice;
-  }
-  newCost = Math.round(newCost * 100) / 100;
+  // Directly update cost price to the new purchase cost price instead of weighted average
+  const newCost = inPrice > 0 ? Math.round(inPrice * 100) / 100 : oldCost;
 
   const newStock = Math.round((Math.max(0, oldStock) + inQty) * 100) / 100;
   const newRetail = (retailPrice !== null && retailPrice !== undefined && retailPrice !== '') 

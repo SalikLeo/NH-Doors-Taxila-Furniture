@@ -286,7 +286,6 @@ const app = {
             }
             break;
           }
-          case 'rate-list': (window.RateList || RateList).render(panel, args); break;
           case 'expenses': (window.Expenses || Expenses).render(panel); break;
           case 'companies': (window.Companies || Companies).render(panel); break;
           case 'reports': (window.Reports || Reports).render(panel); break;
@@ -357,7 +356,6 @@ const app = {
       'customers': 'Customers',
       'item-sales': 'Item Sales',
       'master-db': 'Stock',
-      'rate-list': 'Rate List',
       'expenses': 'Expenses',
       'reports': 'Reports',
       'companies': 'Purchases',

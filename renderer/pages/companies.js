@@ -3252,7 +3252,7 @@ window.Companies = {
         transactions.unshift(newTxn);
         window.storage.set(txnKey, transactions);
 
-        // 3. Update Stock & Cost Price using Weighted Average Cost
+        // 3. Update Stock & Cost Price to New Cost Price
         for (const update of stockUpdates) {
             await window.api.addProductStock({
                 category: update.slug,
