@@ -269,7 +269,7 @@ const MasterDB = {
             <div class="mb-4">
               <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Add New Category</label>
               <div class="flex gap-2">
-                <input type="text" id="new-cat-name" placeholder="e.g. Smart Home, CCTV..." 
+                <input type="text" id="new-cat-name" placeholder="Category Name..." 
                   onkeydown="if(event.key==='Enter') MasterDB.addNewCategory()"
                   class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:bg-white outline-none transition-all">
                 <button onclick="MasterDB.addNewCategory()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2">
@@ -287,7 +287,7 @@ const MasterDB = {
             <div class="mb-4">
               <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 px-1">Add New Unit</label>
               <div class="flex gap-2">
-                <input type="text" id="new-unit-name" placeholder="e.g. METER, PKT, BDL..." 
+                <input type="text" id="new-unit-name" placeholder="Unit Name (PCS, KGS, FT...)" 
                   onkeydown="if(event.key==='Enter') MasterDB.addNewUnit()"
                   class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:bg-white outline-none transition-all uppercase">
                 <button onclick="MasterDB.addNewUnit()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2">

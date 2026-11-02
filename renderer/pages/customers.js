@@ -220,7 +220,7 @@ const Customers = window.Customers = {
           <form id="customer-form" onsubmit="Customers.saveCustomerForm(event)" class="p-6 space-y-4">
             <div>
               <label class="block text-xs font-black uppercase text-slate-500 mb-1">Customer Full Name <span class="text-rose-500">*</span></label>
-              <input type="text" id="cust-name-input" required placeholder="e.g. Muhammad Ali" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
+              <input type="text" id="cust-name-input" required placeholder="Customer Name" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -231,7 +231,7 @@ const Customers = window.Customers = {
                        required 
                        maxlength="11"
                        oninput="this.value = this.value.replace(/\D/g, '').slice(0, 11);"
-                       placeholder="e.g. 03001234567" 
+                       placeholder="Phone Number" 
                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
               </div>
               <div>
@@ -249,12 +249,12 @@ const Customers = window.Customers = {
 
             <div>
               <label class="block text-xs font-black uppercase text-slate-500 mb-1">Address / Street / Area</label>
-              <input type="text" id="cust-address-input" placeholder="e.g. Street 4, Lala Rukh, Wah Cantt" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
+              <input type="text" id="cust-address-input" placeholder="Address / Location" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
             </div>
 
             <div>
               <label class="block text-xs font-black uppercase text-slate-500 mb-1">Notes / Description</label>
-              <input type="text" id="cust-notes-input" placeholder="e.g. Local regular customer" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
+              <input type="text" id="cust-notes-input" placeholder="Notes (Optional)" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500 outline-none">
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">

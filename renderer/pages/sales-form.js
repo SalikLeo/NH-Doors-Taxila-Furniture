@@ -165,7 +165,7 @@ window.SalesForm = {
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 relative">
                 <div class="relative">
-                  <input type="text" id="sf-customer-name" value="${this.customerName}" placeholder="Customer Name (e.g. Tariq Mehmood)"
+                  <input type="text" id="sf-customer-name" value="${this.customerName}" placeholder="Customer Name"
                     autocomplete="off"
                     oninput="SalesForm.handleCustomerInput(this.value)"
                     onfocus="SalesForm.handleCustomerInput(this.value)"
@@ -176,7 +176,7 @@ window.SalesForm = {
                 </div>
 
                 <div>
-                  <input type="text" id="sf-customer-phone" value="${this.customerPhone}" placeholder="Phone Number (e.g. 0300-1234567)"
+                  <input type="text" id="sf-customer-phone" value="${this.customerPhone}" placeholder="Phone Number"
                     oninput="SalesForm.customerPhone = this.value"
                     class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none">
                 </div>
@@ -192,7 +192,7 @@ window.SalesForm = {
                     1. Customer Bill (Printed on Receipt)
                   </h2>
                   <p class="text-[11px] text-slate-500 font-medium mt-0.5">
-                    What is the customer ordering? (e.g. 5 Doors, Wardrobe, Bed Set)
+                    What is the customer ordering?
                   </p>
                 </div>
                 <span class="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
@@ -204,7 +204,7 @@ window.SalesForm = {
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div class="sm:col-span-6">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Item Description / Name</label>
-                  <input type="text" id="sf-new-item-desc" placeholder="e.g. 5 Solid Wood Doors"
+                  <input type="text" id="sf-new-item-desc" placeholder="Item Description / Name"
                     onkeydown="if(event.key === 'Enter') { document.getElementById('sf-new-item-price').focus(); }"
                     class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 focus:border-emerald-500 outline-none">
                 </div>
@@ -215,7 +215,7 @@ window.SalesForm = {
                 </div>
                 <div class="sm:col-span-3">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Total Price (Rs.)</label>
-                  <input type="number" id="sf-new-item-price" placeholder="e.g. 35000" min="0" step="1"
+                  <input type="number" id="sf-new-item-price" placeholder="Price" min="0" step="1"
                     onkeydown="if(event.key === 'Enter') SalesForm.addOrderItem();"
                     class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 text-right focus:border-emerald-500 outline-none font-mono">
                 </div>
@@ -258,7 +258,7 @@ window.SalesForm = {
                     2. Materials Used From Stock (Workshop Only)
                   </h2>
                   <p class="text-[11px] text-slate-500 font-medium mt-0.5">
-                    Select items used (Panels, Lar, Glue, etc.) to reduce from inventory.
+                    Select stock materials used to reduce from inventory.
                   </p>
                 </div>
                 <span class="text-xs font-black text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
@@ -270,7 +270,7 @@ window.SalesForm = {
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div class="sm:col-span-7 relative">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Select Material from Stock</label>
-                  <input type="text" id="sf-material-search" placeholder="Search material (e.g. Panel, Lar, Glue)..."
+                  <input type="text" id="sf-material-search" placeholder="Search material from stock..."
                     autocomplete="off"
                     oninput="SalesForm.handleMaterialSearch(this.value)"
                     onfocus="SalesForm.handleMaterialSearch(this.value)"
@@ -549,7 +549,7 @@ window.SalesForm = {
     const totalPrice = parseFloat(priceInput?.value) || 0;
 
     if (!desc) {
-      app.showAlert('Please enter an item name (e.g. 5 Doors).');
+      app.showAlert('Please enter an item name.');
       descInput?.focus();
       return;
     }
@@ -591,7 +591,7 @@ window.SalesForm = {
       tbody.innerHTML = `
         <tr>
           <td colspan="5" class="py-8 text-center text-slate-400 text-xs font-medium">
-            No items in customer bill yet. Add an item above (e.g. "5 Doors - Rs. 35,000").
+            No items in customer bill yet. Add an item above.
           </td>
         </tr>
       `;
@@ -898,7 +898,7 @@ window.SalesForm = {
   // Save order to database & print receipt
   async saveOrder(shouldPrint = false) {
     if (this.orderItems.length === 0) {
-      app.showAlert('Please add at least one item to the customer bill (e.g. 5 Doors).');
+      app.showAlert('Please add at least one item to the customer bill.');
       document.getElementById('sf-new-item-desc')?.focus();
       return;
     }
