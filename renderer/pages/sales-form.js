@@ -167,10 +167,16 @@ window.SalesForm = {
                 <div class="relative">
                   <input type="text" id="sf-customer-name" value="${this.customerName}" placeholder="Customer Name"
                     autocomplete="off"
+                    ${this.customerId ? 'readonly' : ''}
                     oninput="SalesForm.handleCustomerInput(this.value)"
-                    onfocus="SalesForm.handleCustomerInput(this.value)"
-                    onclick="SalesForm.handleCustomerInput(this.value)"
-                    class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none">
+                    onfocus="if(!this.readOnly) SalesForm.handleCustomerInput(this.value)"
+                    onclick="if(!this.readOnly) SalesForm.handleCustomerInput(this.value)"
+                    class="w-full ${this.customerId ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50 focus:bg-white'} border border-slate-300 rounded-lg px-3 py-2 pr-8 text-sm font-bold text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none">
+                  <button type="button" id="sf-customer-clear-btn" onclick="SalesForm.clearCustomerSelection()"
+                    class="${this.customerId || this.customerName ? '' : 'hidden'} absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded-full transition-all"
+                    title="Clear customer">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
                   <!-- Customer Suggestions Dropdown -->
                   <div id="sf-customer-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto"></div>
                 </div>
@@ -270,12 +276,19 @@ window.SalesForm = {
               <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div class="sm:col-span-7 relative">
                   <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Select Material from Stock</label>
-                  <input type="text" id="sf-material-search" placeholder="Search material from stock..."
-                    autocomplete="off"
-                    oninput="SalesForm.handleMaterialSearch(this.value)"
-                    onfocus="SalesForm.handleMaterialSearch(this.value)"
-                    onclick="SalesForm.handleMaterialSearch(this.value)"
-                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 focus:border-amber-500 outline-none">
+                  <div class="relative">
+                    <input type="text" id="sf-material-search" placeholder="Search material from stock..."
+                      autocomplete="off"
+                      oninput="SalesForm.handleMaterialSearch(this.value)"
+                      onfocus="if(!this.readOnly) SalesForm.handleMaterialSearch(this.value)"
+                      onclick="if(!this.readOnly) SalesForm.handleMaterialSearch(this.value)"
+                      class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 pr-8 text-sm font-bold text-slate-800 focus:border-amber-500 outline-none">
+                    <button type="button" id="sf-material-clear-btn" onclick="SalesForm.clearStockMaterialSelection()"
+                      class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded-full transition-all"
+                      title="Clear selected material">
+                      <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                  </div>
                   <!-- Stock Dropdown Suggestions -->
                   <div id="sf-material-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto"></div>
                 </div>
@@ -480,6 +493,15 @@ window.SalesForm = {
   // Customer handling
   handleCustomerInput(query) {
     this.customerName = query;
+    const clearBtn = document.getElementById('sf-customer-clear-btn');
+    if (clearBtn) {
+      if (query && query.trim().length > 0) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+    }
+
     const dropdown = document.getElementById('sf-customer-dropdown');
     if (!dropdown) return;
 
@@ -520,8 +542,16 @@ window.SalesForm = {
 
     const nameInput = document.getElementById('sf-customer-name');
     const phoneInput = document.getElementById('sf-customer-phone');
-    if (nameInput) nameInput.value = this.customerName;
+    const clearBtn = document.getElementById('sf-customer-clear-btn');
+
+    if (nameInput) {
+      nameInput.value = this.customerName;
+      nameInput.readOnly = true;
+      nameInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+      nameInput.classList.remove('focus:bg-white');
+    }
     if (phoneInput) phoneInput.value = this.customerPhone;
+    if (clearBtn) clearBtn.classList.remove('hidden');
 
     const balanceBadge = document.getElementById('sf-cust-balance-badge');
     const balanceVal = document.getElementById('sf-cust-balance-val');
@@ -533,6 +563,33 @@ window.SalesForm = {
         balanceBadge.classList.add('hidden');
       }
     }
+
+    const dropdown = document.getElementById('sf-customer-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+  },
+
+  clearCustomerSelection() {
+    this.customerId = null;
+    this.customerName = '';
+    this.customerPhone = '';
+    this.customerBalance = 0;
+
+    const nameInput = document.getElementById('sf-customer-name');
+    const phoneInput = document.getElementById('sf-customer-phone');
+    const clearBtn = document.getElementById('sf-customer-clear-btn');
+
+    if (nameInput) {
+      nameInput.value = '';
+      nameInput.readOnly = false;
+      nameInput.classList.remove('bg-slate-100', 'cursor-not-allowed');
+      nameInput.classList.add('focus:bg-white');
+      nameInput.focus();
+    }
+    if (phoneInput) phoneInput.value = '';
+    if (clearBtn) clearBtn.classList.add('hidden');
+
+    const balanceBadge = document.getElementById('sf-cust-balance-badge');
+    if (balanceBadge) balanceBadge.classList.add('hidden');
 
     const dropdown = document.getElementById('sf-customer-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
@@ -685,12 +742,43 @@ window.SalesForm = {
 
     this.selectedStockItem = item;
     const searchInput = document.getElementById('sf-material-search');
+    const clearBtn = document.getElementById('sf-material-clear-btn');
     const unitBadge = document.getElementById('sf-selected-unit');
     const qtyInput = document.getElementById('sf-material-qty');
 
-    if (searchInput) searchInput.value = `${item.item_name} (In Stock: ${item.current_stock || 0} ${item.unit || 'pcs'})`;
+    if (searchInput) {
+      searchInput.value = `${item.item_name} (In Stock: ${item.current_stock || 0} ${item.unit || 'pcs'})`;
+      searchInput.readOnly = true;
+      searchInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+    }
+    if (clearBtn) {
+      clearBtn.classList.remove('hidden');
+    }
     if (unitBadge) unitBadge.textContent = `(${item.unit || 'pcs'})`;
     if (qtyInput) qtyInput.focus();
+
+    const dropdown = document.getElementById('sf-material-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+  },
+
+  clearStockMaterialSelection() {
+    this.selectedStockItem = null;
+    const searchInput = document.getElementById('sf-material-search');
+    const clearBtn = document.getElementById('sf-material-clear-btn');
+    const unitBadge = document.getElementById('sf-selected-unit');
+    const qtyInput = document.getElementById('sf-material-qty');
+
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.readOnly = false;
+      searchInput.classList.remove('bg-slate-100', 'cursor-not-allowed');
+      searchInput.focus();
+    }
+    if (clearBtn) {
+      clearBtn.classList.add('hidden');
+    }
+    if (unitBadge) unitBadge.textContent = '';
+    if (qtyInput) qtyInput.value = '1';
 
     const dropdown = document.getElementById('sf-material-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
@@ -736,8 +824,14 @@ window.SalesForm = {
 
     this.selectedStockItem = null;
     const searchInput = document.getElementById('sf-material-search');
+    const clearBtn = document.getElementById('sf-material-clear-btn');
     const unitBadge = document.getElementById('sf-selected-unit');
-    if (searchInput) searchInput.value = '';
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.readOnly = false;
+      searchInput.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    }
+    if (clearBtn) clearBtn.classList.add('hidden');
     if (unitBadge) unitBadge.textContent = '';
     if (qtyInput) qtyInput.value = '1';
 
