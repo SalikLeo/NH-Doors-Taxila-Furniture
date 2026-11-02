@@ -115,6 +115,8 @@ window.SalesForm = {
     }
 
     this.buildUI(container);
+    this.renderOrderItems();
+    this.renderUsedMaterials();
     this.setupShortcuts();
     this.recalculate();
   },
@@ -407,6 +409,8 @@ window.SalesForm = {
     `;
 
     if (window.lucide) lucide.createIcons();
+    this.renderOrderItems();
+    this.renderUsedMaterials();
     this.startClock();
   },
 
