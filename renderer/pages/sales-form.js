@@ -167,6 +167,7 @@ window.SalesForm = {
                     autocomplete="off"
                     oninput="SalesForm.handleCustomerInput(this.value)"
                     onfocus="SalesForm.handleCustomerInput(this.value)"
+                    onclick="SalesForm.handleCustomerInput(this.value)"
                     class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none">
                   <!-- Customer Suggestions Dropdown -->
                   <div id="sf-customer-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto"></div>
@@ -271,6 +272,7 @@ window.SalesForm = {
                     autocomplete="off"
                     oninput="SalesForm.handleMaterialSearch(this.value)"
                     onfocus="SalesForm.handleMaterialSearch(this.value)"
+                    onclick="SalesForm.handleMaterialSearch(this.value)"
                     class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 focus:border-amber-500 outline-none">
                   <!-- Stock Dropdown Suggestions -->
                   <div id="sf-material-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto"></div>
@@ -433,20 +435,40 @@ window.SalesForm = {
         e.preventDefault();
         this.saveOrder(false);
       } else if (e.key === 'Escape') {
-        const ddCust = document.getElementById('sf-customer-dropdown');
-        const ddMat = document.getElementById('sf-material-dropdown');
-        if (ddCust && !ddCust.classList.contains('hidden')) {
-          ddCust.classList.add('hidden');
-          return;
-        }
-        if (ddMat && !ddMat.classList.contains('hidden')) {
-          ddMat.classList.add('hidden');
-          return;
-        }
+        this.closeAllDropdowns();
       }
     };
     window.removeEventListener('keydown', this.keydownHandler);
     window.addEventListener('keydown', this.keydownHandler);
+
+    this.outsideClickHandler = (e) => {
+      if (app.currentPage !== 'proposal-form') return;
+
+      const matDropdown = document.getElementById('sf-material-dropdown');
+      const matInput = document.getElementById('sf-material-search');
+      if (matDropdown && !matDropdown.classList.contains('hidden')) {
+        if (!matDropdown.contains(e.target) && e.target !== matInput) {
+          matDropdown.classList.add('hidden');
+        }
+      }
+
+      const custDropdown = document.getElementById('sf-customer-dropdown');
+      const custInput = document.getElementById('sf-customer-name');
+      if (custDropdown && !custDropdown.classList.contains('hidden')) {
+        if (!custDropdown.contains(e.target) && e.target !== custInput) {
+          custDropdown.classList.add('hidden');
+        }
+      }
+    };
+    document.removeEventListener('click', this.outsideClickHandler);
+    document.addEventListener('click', this.outsideClickHandler);
+  },
+
+  closeAllDropdowns() {
+    const matDropdown = document.getElementById('sf-material-dropdown');
+    if (matDropdown) matDropdown.classList.add('hidden');
+    const custDropdown = document.getElementById('sf-customer-dropdown');
+    if (custDropdown) custDropdown.classList.add('hidden');
   },
 
   // Customer handling
@@ -456,19 +478,22 @@ window.SalesForm = {
     if (!dropdown) return;
 
     const q = (query || '').trim().toLowerCase();
-    const matches = this.customers.filter(c => 
-      (c.name && c.name.toLowerCase().includes(q)) || 
-      (c.phone && c.phone.includes(q))
+    const matches = (q
+      ? this.customers.filter(c => 
+          (c.name && c.name.toLowerCase().includes(q)) || 
+          (c.phone && c.phone.includes(q))
+        )
+      : this.customers
     ).slice(0, 8);
 
-    if (matches.length === 0 || !q) {
+    if (matches.length === 0) {
       dropdown.classList.add('hidden');
       dropdown.innerHTML = '';
       return;
     }
 
     dropdown.innerHTML = matches.map((c, i) => `
-      <div onclick="SalesForm.selectCustomer(${c.id})" class="px-3 py-2 hover:bg-amber-50 cursor-pointer border-b border-slate-100 flex items-center justify-between text-xs">
+      <div onclick="SalesForm.selectCustomer(${c.id})" class="px-3 py-2 hover:bg-amber-50 cursor-pointer border-b border-slate-100 flex items-center justify-between text-xs transition-colors">
         <div>
           <span class="font-bold text-slate-800">${c.name}</span>
           ${c.phone ? `<span class="text-slate-400 ml-2 font-mono">${c.phone}</span>` : ''}
@@ -590,36 +615,59 @@ window.SalesForm = {
     if (!dropdown) return;
 
     const q = (query || '').trim().toLowerCase();
-    const matches = this.availableStock.filter(p => 
-      (p.item_name && p.item_name.toLowerCase().includes(q)) ||
-      (p.category_label && p.category_label.toLowerCase().includes(q)) ||
-      (p.description && p.description.toLowerCase().includes(q))
-    ).slice(0, 10);
+    const matches = (q
+      ? this.availableStock.filter(p => 
+          (p.item_name && p.item_name.toLowerCase().includes(q)) ||
+          (p.category_label && p.category_label.toLowerCase().includes(q)) ||
+          (p.description && p.description.toLowerCase().includes(q))
+        )
+      : this.availableStock
+    ).slice(0, 15);
 
-    if (matches.length === 0 || !q) {
+    if (matches.length === 0) {
       dropdown.classList.add('hidden');
       dropdown.innerHTML = '';
       return;
     }
 
-    dropdown.innerHTML = matches.map(p => `
-      <div onclick="SalesForm.selectStockMaterial(${p.id}, '${p.slug}')" class="px-3 py-2 hover:bg-amber-50 cursor-pointer border-b border-slate-100 flex items-center justify-between text-xs">
-        <div>
-          <span class="font-bold text-slate-800">${p.item_name}</span>
-          <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded ml-2">${p.category_label || p.slug}</span>
+    dropdown.innerHTML = matches.map(p => {
+      const isAlreadyAdded = this.usedMaterials.some(m => m.id === p.id && m.section === p.slug);
+      if (isAlreadyAdded) {
+        return `
+          <div class="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs opacity-55 cursor-not-allowed select-none" title="Already added to order">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="font-bold text-slate-400 line-through truncate">${p.item_name}</span>
+              <span class="text-[9px] bg-slate-200 text-slate-600 font-black px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">Already Added</span>
+            </div>
+            <div class="text-right shrink-0 ml-2">
+              <span class="font-semibold text-slate-400 text-[11px]">Stock: ${p.current_stock || 0} ${p.unit || 'pcs'}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div onclick="SalesForm.selectStockMaterial(${p.id}, '${p.slug}')" class="px-3 py-2 hover:bg-amber-50 cursor-pointer border-b border-slate-100 flex items-center justify-between text-xs transition-colors">
+          <div class="min-w-0">
+            <span class="font-bold text-slate-800">${p.item_name}</span>
+            <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded ml-2">${p.category_label || p.slug}</span>
+          </div>
+          <div class="text-right shrink-0 ml-2">
+            <span class="font-bold ${p.current_stock > 0 ? 'text-emerald-600' : 'text-rose-500'}">
+              Stock: ${p.current_stock || 0} ${p.unit || 'pcs'}
+            </span>
+            <span class="text-slate-400 text-[11px] ml-2 font-mono">Cost: Rs. ${Number(p.cost_price || 0).toLocaleString()}</span>
+          </div>
         </div>
-        <div class="text-right">
-          <span class="font-bold ${p.current_stock > 0 ? 'text-emerald-600' : 'text-rose-500'}">
-            Stock: ${p.current_stock || 0} ${p.unit || 'pcs'}
-          </span>
-          <span class="text-slate-400 text-[11px] ml-2 font-mono">Cost: Rs. ${Number(p.cost_price || 0).toLocaleString()}</span>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     dropdown.classList.remove('hidden');
   },
 
   selectStockMaterial(id, slug) {
+    const isAlreadyAdded = this.usedMaterials.some(m => m.id === id && m.section === slug);
+    if (isAlreadyAdded) return;
+
     const item = this.availableStock.find(p => p.id === id && p.slug === slug);
     if (!item) return;
 
